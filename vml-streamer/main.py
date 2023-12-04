@@ -1,4 +1,4 @@
-import cv2, socket, json, numpy as np
+import cv2, socket, json, platform, numpy as np
 import mediapipe as mp
 import dearpygui.dearpygui as dpg
 import dpg_callback
@@ -30,14 +30,14 @@ with dpg.item_handler_registry(tag='window_handler') as window_handler:
 # DPG UI
 with dpg.window(tag='mainwin') as mainwin:
 	dpg.add_image('cv_frame', tag='webcam_image')
-	dpg.add_button(label='Add stream', callback=dpg_callback.add_stream)
+	dpg.add_button(label='Add stream', tag='add_stream', callback=dpg_callback.add_stream)
 	dpg.add_group(tag='streams')
 
 # DPG bind event handlers
 dpg.bind_item_handler_registry(mainwin, window_handler)
 
 # DPG top menu bar
-with dpg.viewport_menu_bar():
+with dpg.viewport_menu_bar() as mainmenu:
 	with dpg.menu(label='Settings'):
 		#with dpg.menu(label='Capture device:'):
 		#	dpg.add_radio_button(items=list(range(10)), default_value='0', callback=change_capture_device)
@@ -50,8 +50,15 @@ dpg.set_viewport_height(frame_height*3)
 dpg.set_primary_window(mainwin, True)
 
 # CV Init video capture
-vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-if vid.isOpened():
+webcam_found = False
+if platform.system()=='Windows':
+	vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+	webcam_found = vid.isOpened()
+elif platform.system()=='Linux':
+	vid = cv2.VideoCapture(0)
+	webcam_found = vid.isOpened()
+
+if webcam_found:
 
 	# Webcam properties
 	vid.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
@@ -148,6 +155,17 @@ if vid.isOpened():
 		# DPG render UI
 		dpg.render_dearpygui_frame()
 
+else:
+	# no webcam detected, exiting
+	dpg.configure_viewport(0, width=400, height=200)
+	dpg.delete_item(mainwin, children_only=True)
+	dpg.delete_item(mainmenu)
+	dpg.add_text('No webcam device found!', color=(255,0,0), parent=mainwin)
+	dpg.add_text('Please connect a device and re-launch application.', color=(255,0,0), parent=mainwin)
+	dpg.add_button(label='   OK   ', callback=dpg_callback.terminate, parent=mainwin)
+	dpg.start_dearpygui()
+
+	
 # terminate
 vid.release()
 cv2.destroyAllWindows() 

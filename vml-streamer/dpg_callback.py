@@ -1,4 +1,9 @@
+import sys
 import dearpygui.dearpygui as dpg
+
+# closes window if no capture device found
+def terminate():
+	sys.exit(0)
 
 # remap value between range
 def change_range(unscaled, from_min, from_max, to_min, to_max):
@@ -11,8 +16,9 @@ def resize_img(sender, app_data, user_data):
 	w, h = dpg.get_item_rect_size(win)
 	newW = w-18
 	newH = newW*user_data['image_aspect']
-	dpg.configure_item(img, width=newW)
-	dpg.configure_item(img, height=newH)
+	if dpg.does_alias_exist(img):
+		dpg.configure_item(img, width=newW)
+		dpg.configure_item(img, height=newH)
 
 # display extra settings for chosen stream type
 def show_extra_settings(sender, app_data, user_data):
