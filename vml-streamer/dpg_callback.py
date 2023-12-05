@@ -1,4 +1,4 @@
-import sys
+import sys, subprocess
 import dearpygui.dearpygui as dpg
 
 # closes window if no capture device found
@@ -19,6 +19,10 @@ def resize_img(sender, app_data, user_data):
 	if dpg.does_alias_exist(img):
 		dpg.configure_item(img, width=newW)
 		dpg.configure_item(img, height=newH)
+
+# set viewport "always on top" mode
+def always_on_top(sender):
+	dpg.configure_viewport(0, always_on_top=dpg.get_value(sender))
 
 # display extra settings for chosen stream type
 def show_extra_settings(sender, app_data, user_data):
@@ -132,4 +136,17 @@ def add_stream(sender, app_data, user_data):
 			
 		dpg.add_separator()
 
+# change webcam config control (linux only!) using v4l2-ctl in a subprocess
+def set_webcam_config(sender, app_data, user_data):
+	ctrl = user_data
+	val = dpg.get_value(sender)
+	cmd = f'v4l2-ctl --set-ctrl {ctrl}={val}'
+	subprocess.call(cmd.split())
+
+# get webcam config control (linux only!) using v4l2-ctl in a subprocess
+def get_webcam_config(ctrl):
+	cmd = f'v4l2-ctl --get-ctrl {ctrl}'
+	ret = subprocess.check_output(cmd.split()).decode()
+	ret = ret.split(':')[1].replace('\n', '').strip()
+	return float(ret)
 
