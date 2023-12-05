@@ -2,7 +2,7 @@ import time, cv2, socket, json, platform, numpy as np
 import mediapipe as mp
 import dearpygui.dearpygui as dpg
 import dpg_callback
-import process_mp_hands
+import process_mp_hands, process_mp_body
 
 # CV VideoCapture resolution
 frame_width  = 320
@@ -77,6 +77,7 @@ if vid.isOpened():
 	
 	# MediaPipe init
 	hands = process_mp_hands.MediaPipe_Hands(frame_width, frame_height)
+	bodies = process_mp_body.MediaPipe_Bodies(frame_width, frame_height)
 
 	# initialize static info dictionary (image width/height etc)
 	info = {}
@@ -150,7 +151,22 @@ if vid.isOpened():
 					display_image = hands.display_image
 					cv2.cvtColor(display_image, cv2.COLOR_RGB2BGR)
 					joints_json = json.dumps(hands.joints)
-					skt.sendto(joints_json.encode(), addr_port)
+					if len(hands.joints.keys())>0:
+						skt.sendto(joints_json.encode(), addr_port)
+
+				# MEDIAPIPE (BODY)
+				if stream['type']=='MediaPipe Body':
+					#timestamp = int(vid.get(cv2.CAP_PROP_POS_MSEC))
+					timestamp = counter
+					bodies.apply_filter = stream['apply_filter']
+					bodies.one_euro_beta = stream['beta']
+					bodies.image = mp.Image(mp.ImageFormat.SRGB, data=data)
+					bodies.detect(timestamp)	
+					display_image = bodies.display_image
+					cv2.cvtColor(display_image, cv2.COLOR_RGB2BGR)
+					joints_json = json.dumps(bodies.joints)
+					if len(bodies.joints.keys())>0:
+						skt.sendto(joints_json.encode(), addr_port)
 
 			# overlay fps
 			if iteration==1: start_time = time.time()

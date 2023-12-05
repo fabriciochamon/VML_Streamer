@@ -29,6 +29,7 @@ def show_extra_settings(sender, app_data, user_data):
 	dpg.hide_item(f'Info Dictionary settings {user_data}')
 	dpg.hide_item(f'Webcam settings {user_data}')
 	dpg.hide_item(f'MediaPipe Hands settings {user_data}')
+	dpg.hide_item(f'MediaPipe Body settings {user_data}')
 	dpg.show_item(f'{dpg.get_value(sender)} settings {user_data}')
 
 # return a dictionary with all stream inputs
@@ -47,6 +48,10 @@ def get_streams():
 
 		#extra settings
 		if stype=='MediaPipe Hands':
+			stream['apply_filter'] = dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[0], 1)[1])
+			stream['smoothing_factor'] = dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[0], 1)[3])
+			stream['beta'] = change_range(stream['smoothing_factor'], 0, 100, 100, 0.5)
+		if stype=='MediaPipe Body':
 			stream['apply_filter'] = dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[0], 1)[1])
 			stream['smoothing_factor'] = dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[0], 1)[3])
 			stream['beta'] = change_range(stream['smoothing_factor'], 0, 100, 100, 0.5)
@@ -85,7 +90,7 @@ def del_stream(sender, app_data, user_data):
 def add_stream(sender, app_data, user_data):
 	# defaults
 	streams_grp = 'streams'
-	stream_types = ['Info Dictionary', 'Webcam', 'MediaPipe Hands']
+	stream_types = ['Info Dictionary', 'Webcam', 'MediaPipe Hands', 'MediaPipe Body']
 	
 	stream_input = get_new_stream_input()
 	index = stream_input['index']
@@ -133,6 +138,13 @@ def add_stream(sender, app_data, user_data):
 				with dpg.tooltip(parent=dpg.last_item()):
 					dpg.add_text('Applies a "One-Euro" smoothing filter over the input signal.', wrap=200)
 				dpg.add_slider_float(tag=f'settings_mphands_filterbeta{index}', default_value=60, min_value=0, max_value=100, width=120)
+		with dpg.group(tag=f'MediaPipe Body settings {index}', indent=20, show=False):
+			with dpg.group(horizontal=True):
+				dpg.add_text('Motion filter:', color=(245, 212, 66))
+				dpg.add_checkbox(tag=f'settings_mbodies_applyfilter{index}', default_value=True)
+				with dpg.tooltip(parent=dpg.last_item()):
+					dpg.add_text('Applies a "One-Euro" smoothing filter over the input signal.', wrap=200)
+				dpg.add_slider_float(tag=f'settings_mbodies_filterbeta{index}', default_value=60, min_value=0, max_value=100, width=120)
 			
 		dpg.add_separator()
 
