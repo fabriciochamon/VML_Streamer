@@ -74,14 +74,7 @@ if vid.isOpened():
 	# Optionally set webcam properties
 	vid.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
 	vid.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
-	'''
-	vid.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1) # manual mode
-	vid.set(cv2.CAP_PROP_EXPOSURE, 500)
-	vid.set(cv2.CAP_PROP_GAIN, 100)
-	vid.set(cv2.CAP_PROP_BRIGHTNESS, 128)
-	vid.set(cv2.CAP_PROP_CONTRAST, 32)
-	'''
-
+	
 	# MediaPipe init
 	hands = process_mp_hands.MediaPipe_Hands(frame_width, frame_height)
 
@@ -95,12 +88,17 @@ if vid.isOpened():
 	fps = vid.get(cv2.CAP_PROP_FPS)
 	textsize = cv2.getTextSize(f'fps: {fps}', fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=0.5, thickness=1)
 	textpos = (5, frame_height-textsize[1]-5)
-	iteration = 0
 	start_time = None
 	
+	# "iteration" is reset at every "fps_frames", and used to calculate current fps
+	# "counter" is always increasing, and used as a timestamp for the MediaPipe detector
+	iteration = 0
+	counter = 0
+
 	# Main UI loop
 	while dpg.is_dearpygui_running():
 		iteration+=1
+		counter +=1
 
 		# read webcam frame
 		success, frame = vid.read()
@@ -143,7 +141,8 @@ if vid.isOpened():
 
 				# MEDIAPIPE (HANDS)
 				if stream['type']=='MediaPipe Hands':
-					timestamp = int(vid.get(cv2.CAP_PROP_POS_MSEC))
+					#timestamp = int(vid.get(cv2.CAP_PROP_POS_MSEC))
+					timestamp = counter
 					hands.apply_filter = stream['apply_filter']
 					hands.one_euro_beta = stream['beta']
 					hands.image = mp.Image(mp.ImageFormat.SRGB, data=data)
