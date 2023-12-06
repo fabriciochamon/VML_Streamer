@@ -1,4 +1,5 @@
 import time, cv2, socket, json, platform, numpy as np
+from webcam_stream import WebcamVideoStream
 import mediapipe as mp
 import dearpygui.dearpygui as dpg
 import dpg_callback
@@ -30,17 +31,26 @@ with dpg.item_handler_registry(tag='window_handler') as window_handler:
 
 # DPG UI
 with dpg.window(tag='mainwin') as mainwin:
+	
+	# opencv webcam feedback
 	dpg.add_image('cv_frame', tag='webcam_image')
-	# add webcam config for linux users
+	
+	# webcam config controls (for linux only!)
 	if platform.system()=='Linux':
 		dpg.add_text('Camera controls:')
 		config_controls = ['gain', 'brightness', 'saturation']		
 		for ctrl in config_controls:			
 			with dpg.group(horizontal=True):
 				dpg.add_text(ctrl.capitalize().ljust(15)+':')
-				ctrl_val = dpg_callback.get_webcam_config(ctrl)
-				dpg.add_slider_float(default_value=ctrl_val, min_value=0, max_value=ctrl_val*2, width=120, callback=dpg_callback.set_webcam_config, user_data=ctrl)
+				# check if webcam device is available and set control value, ignore otherwise
+				try:
+					ctrl_val = dpg_callback.get_webcam_config(ctrl)
+					dpg.add_slider_float(default_value=ctrl_val, min_value=0, max_value=ctrl_val*2, width=120, callback=dpg_callback.set_webcam_config, user_data=ctrl)
+				except:
+					pass
 		dpg.add_spacer(height=15)
+	
+	# "add stream" button
 	dpg.add_button(label='Add stream', tag='add_stream', callback=dpg_callback.add_stream)
 	dpg.add_group(tag='streams')
 
@@ -63,46 +73,38 @@ dpg.set_viewport_height(720)
 dpg.set_primary_window(mainwin, True)
 
 # CV Init video capture
-vcap_api = cv2.CAP_ANY
-if platform.system()=='Windows': vcap_api = cv2.CAP_DSHOW
-if platform.system()=='Linux':   vcap_api = cv2.CAP_V4L2
-vid = cv2.VideoCapture(0, vcap_api)
+vs = WebcamVideoStream(0, frame_width, frame_height).start()
 display_image = None
 
-if vid.isOpened():
+# timestamps for mediapipe
+ts={}
+ts_last={}
+data_last={}
 
-	# Optionally set webcam properties
-	vid.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
-	vid.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
-	
+if vs.isOpened():
+
 	# MediaPipe init
-	hands = process_mp_hands.MediaPipe_Hands(frame_width, frame_height)
+	hands  = process_mp_hands.MediaPipe_Hands(frame_width, frame_height)
 	bodies = process_mp_body.MediaPipe_Bodies(frame_width, frame_height)
 
-	# initialize static info dictionary (image width/height etc)
+	# Info dict init (static data: width, height, etc)
 	info = {}
 	info['image_width'] = frame_width
 	info['image_height'] = frame_height
 
-	# init calc fps
-	fps_frames = 120
-	fps = vid.get(cv2.CAP_PROP_FPS)
-	textsize = cv2.getTextSize(f'fps: {fps}', fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=0.5, thickness=1)
+	# FPS calc init
+	fps = 30.0
+	textsize = cv2.getTextSize(f'fps: {fps}', fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=0.3, thickness=1)
 	textpos = (5, frame_height-textsize[1]-5)
-	start_time = None
-	
-	# "iteration" is reset at every "fps_frames", and used to calculate current fps
-	# "counter" is always increasing, and used as a timestamp for the MediaPipe detector
-	iteration = 0
+	start_time = time.time()
 	counter = 0
-
+	fps_update_rate_sec = 1 # update fps at every 1 second
+	
 	# Main UI loop
 	while dpg.is_dearpygui_running():
-		iteration+=1
-		counter +=1
-
+		
 		# read webcam frame
-		success, frame = vid.read()
+		success, frame = vs.read()
 
 		if success:
 
@@ -115,12 +117,12 @@ if vid.isOpened():
 			# Encode image to jpg (faster streams) and BGR -> RGB
 			img_jpg = cv2.imencode('.jpg', frame, params=[cv2.IMWRITE_JPEG_QUALITY, 85])[1]
 			data = cv2.imdecode(img_jpg, cv2.IMREAD_COLOR)
-			data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB) # convert RGB
+			data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
 			display_image = data.copy()
 			
 			# UDP streams
 			streams = dpg_callback.get_streams()
-			for stream in streams:
+			for i, stream in enumerate(streams):
 
 				addr_port = (stream['address'], stream['port'])
 
@@ -128,11 +130,11 @@ if vid.isOpened():
 				if stream['type']=='Info Dictionary':
 					info['streams'] = [
 							{
-								'type': s['type'],
-								'address': s['address'],
-								'port': s['port'],
+								'type':    st['type'],
+								'address': st['address'],
+								'port':    st['port'],
 							}
-							for s in streams
+							for st in streams
 						]
 					skt.sendto(json.dumps(info).encode(), addr_port)
 			
@@ -142,59 +144,85 @@ if vid.isOpened():
 
 				# MEDIAPIPE (HANDS)
 				if stream['type']=='MediaPipe Hands':
-					#timestamp = int(vid.get(cv2.CAP_PROP_POS_MSEC))
-					timestamp = counter
-					hands.apply_filter = stream['apply_filter']
-					hands.one_euro_beta = stream['beta']
-					hands.image = mp.Image(mp.ImageFormat.SRGB, data=data)
-					hands.detect(timestamp)	
-					display_image = hands.display_image
-					cv2.cvtColor(display_image, cv2.COLOR_RGB2BGR)
-					joints_json = json.dumps(hands.joints)
-					if len(hands.joints.keys())>0:
-						skt.sendto(joints_json.encode(), addr_port)
-
+					
+					# init timestamp data
+					if i not in ts.keys(): 
+						ts[i] = 0
+						ts_last[i] = -1
+					
+					# run detection
+					ts[i] = int(vs.stream.get(cv2.CAP_PROP_POS_MSEC))
+					if ts[i] > ts_last[i]: 
+						ts_last[i] = ts[i]
+						hands.apply_filter = stream['apply_filter']
+						hands.one_euro_beta = stream['beta']
+						hands.image = mp.Image(mp.ImageFormat.SRGB, data=data)
+						hands.detect(ts[i])	
+					
+					# send data
+					ensure_hand_count = stream['ensure_hand_count'] if 'ensure_hand_count' in stream.keys() else 1
+					if len(hands.joints.keys())>=ensure_hand_count:
+						display_image = hands.display_image
+						cv2.cvtColor(display_image, cv2.COLOR_RGB2BGR)
+						skt.sendto(json.dumps(hands.joints).encode(), addr_port)
+						data_last[i] = hands.joints.copy()
+					else:
+						if i in data_last: skt.sendto(json.dumps(data_last[i]).encode(), addr_port)
+					
 				# MEDIAPIPE (BODY)
 				if stream['type']=='MediaPipe Body':
-					#timestamp = int(vid.get(cv2.CAP_PROP_POS_MSEC))
-					timestamp = counter
-					bodies.apply_filter = stream['apply_filter']
-					bodies.one_euro_beta = stream['beta']
-					bodies.image = mp.Image(mp.ImageFormat.SRGB, data=data)
-					bodies.detect(timestamp)	
-					display_image = bodies.display_image
-					cv2.cvtColor(display_image, cv2.COLOR_RGB2BGR)
-					joints_json = json.dumps(bodies.joints)
-					if len(bodies.joints.keys())>0:
-						skt.sendto(joints_json.encode(), addr_port)
+					
+					# init timestamp data
+					if i not in ts.keys(): 
+						ts[i] = 0
+						ts_last[i] = -1
 
-			# overlay fps
-			if iteration==1: start_time = time.time()
-			if iteration==fps_frames: 
-				fps = int(fps_frames/(time.time()-start_time))
-				iteration = 0
-			cv2.putText(display_image, f'fps: {fps}', textpos, cv2.FONT_HERSHEY_DUPLEX, 0.5, (255,0,0), 1, cv2.LINE_AA)
+					# run detection
+					ts[i] = int(vs.stream.get(cv2.CAP_PROP_POS_MSEC))
+					if ts[i] > ts_last[i]: 
+						ts_last[i] = ts[i]
+						bodies.apply_filter = stream['apply_filter']
+						bodies.one_euro_beta = stream['beta']
+						bodies.image = mp.Image(mp.ImageFormat.SRGB, data=data)
+						bodies.detect(ts[i])	
+
+					# send data
+					if len(bodies.joints.keys())>0:
+						display_image = bodies.display_image
+						cv2.cvtColor(display_image, cv2.COLOR_RGB2BGR)
+						skt.sendto(json.dumps(bodies.joints).encode(), addr_port)
+						data_last[i] = bodies.joints
+					else:
+						if i in data_last: skt.sendto(json.dumps(data_last[i]).encode(), addr_port)
+
+			# print FPS
+			counter+=1
+			if (time.time() - start_time) > fps_update_rate_sec:
+				fps = counter / (time.time() - start_time)
+				counter = 0
+				start_time = time.time()
+			cv2.rectangle(display_image, (0, frame_height-textsize[1]-20), (105, frame_height), (50,50,50), -1)
+			cv2.putText(display_image, f'MT: {fps:.1f}  CV: {vs.fps:.1f}', textpos, cv2.FONT_HERSHEY_DUPLEX, 0.3, (255,255,255), 1, cv2.LINE_AA)
 			
 			# DPG webcam texture update: convert to 32bit float, flatten and normalize 
 			display_image = np.asfarray(display_image.ravel(), dtype='f')
 			texture_data = np.true_divide(display_image, 255.0)
 			dpg.set_value('cv_frame', texture_data)
 
-		# DPG render UI
+		# DPG render UI (max update rate = monitor vsync)
 		dpg.render_dearpygui_frame()
 
 else:
-	# no webcam detected, exiting
+	# no webcam detected (linux only!) 
+	# on windows DSHOW will display an "empty" frame, so user needs to connect devide and restart
 	dpg.configure_viewport(0, width=400, height=200)
 	dpg.delete_item(mainwin, children_only=True)
 	dpg.delete_item(mainmenu)
-	dpg.add_text('No webcam device found!', color=(255,0,0), parent=mainwin)
-	dpg.add_text('Please connect a device and re-launch application.', color=(255,0,0), parent=mainwin)
-	dpg.add_button(label='   OK   ', callback=dpg_callback.terminate, parent=mainwin)
+	dpg.add_text('Error: No webcam device found!', color=(255,0,0), parent=mainwin)
+	dpg.add_text('Please connect a device and restart application.', color=(255,0,0), parent=mainwin)
 	dpg.start_dearpygui()
 
-
-# terminate
-vid.release()
+# Terminate
+vs.stop()
 cv2.destroyAllWindows() 
 dpg.destroy_context()

@@ -1,5 +1,6 @@
 import cv2, mediapipe as mp
 import numpy as np
+import platform
 from one_euro_filter import OneEuroFilter
 from mediapipe.framework.formats import landmark_pb2
 from mediapipe import solutions
@@ -27,7 +28,8 @@ class MediaPipe_Bodies:
 		self.filtered_vals = {}
 		self.mp_data_filter = {}
 		self.running_mode = vision.RunningMode.LIVE_STREAM
-		self.base_options = tasks.BaseOptions(model_asset_path='mediapipe_models/pose_landmarker_lite.task', delegate=tasks.BaseOptions.Delegate.GPU)
+		delegate = tasks.BaseOptions.Delegate.GPU if platform.system()=='Linux' else tasks.BaseOptions.Delegate.CPU
+		self.base_options = tasks.BaseOptions(model_asset_path='mediapipe_models/pose_landmarker_full.task', delegate=delegate)
 		self.options = vision.PoseLandmarkerOptions(base_options=self.base_options, min_pose_detection_confidence=0.8, min_tracking_confidence=0.5, num_poses=1, running_mode=self.running_mode, result_callback=self.on_detection)
 		self.detector = vision.PoseLandmarker.create_from_options(self.options)
 		self.joints = {}

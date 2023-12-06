@@ -51,6 +51,7 @@ def get_streams():
 			stream['apply_filter'] = dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[0], 1)[1])
 			stream['smoothing_factor'] = dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[0], 1)[3])
 			stream['beta'] = change_range(stream['smoothing_factor'], 0, 100, 100, 0.5)
+			stream['ensure_hand_count'] = int(dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[1], 1)[1]))+1
 		if stype=='MediaPipe Body':
 			stream['apply_filter'] = dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[0], 1)[1])
 			stream['smoothing_factor'] = dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[0], 1)[3])
@@ -81,10 +82,14 @@ def get_new_stream_input():
 
 # remove a stream
 def del_stream(sender, app_data, user_data):
+	global ts, ts_last, data_last
 	streams_grp = 'streams'
 	index = user_data
 	stream = f'stream{index}'
 	dpg.delete_item(stream)	
+	ts = {}
+	ts_last = {}
+	data_last = {}
 
 # add a stream
 def add_stream(sender, app_data, user_data):
@@ -133,11 +138,15 @@ def add_stream(sender, app_data, user_data):
 			dpg.add_spacer(height=1)
 		with dpg.group(tag=f'MediaPipe Hands settings {index}', indent=20, show=False):
 			with dpg.group(horizontal=True):
-				dpg.add_text('Motion filter:', color=(245, 212, 66))
+				dpg.add_text('Motion filter:'.ljust(20), color=(245, 212, 66))
 				dpg.add_checkbox(tag=f'settings_mphands_applyfilter{index}', default_value=True)
 				with dpg.tooltip(parent=dpg.last_item()):
 					dpg.add_text('Applies a "One-Euro" smoothing filter over the input signal.', wrap=200)
 				dpg.add_slider_float(tag=f'settings_mphands_filterbeta{index}', default_value=60, min_value=0, max_value=100, width=120)
+			with dpg.group(horizontal=True):
+				dpg.add_text('Ensure both hands:'.ljust(20), color=(245, 212, 66))
+				dpg.add_checkbox(tag=f'settings_mphands_ensureBoth{index}', default_value=False)
+
 		with dpg.group(tag=f'MediaPipe Body settings {index}', indent=20, show=False):
 			with dpg.group(horizontal=True):
 				dpg.add_text('Motion filter:', color=(245, 212, 66))
