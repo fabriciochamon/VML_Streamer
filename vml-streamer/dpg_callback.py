@@ -1,9 +1,6 @@
 import sys, subprocess
 import dearpygui.dearpygui as dpg
-
-# closes window if no capture device found
-def terminate():
-	sys.exit(0)
+import stream_types as st
 
 # remap value between range
 def change_range(unscaled, from_min, from_max, to_min, to_max):
@@ -32,6 +29,16 @@ def show_extra_settings(sender, app_data, user_data):
 	dpg.hide_item(f'MediaPipe Body settings {user_data}')
 	dpg.show_item(f'{dpg.get_value(sender)} settings {user_data}')
 
+# get all custom settings for a specific stream type and index
+def get_stream_settings(tp, idx):
+	aliases = dpg.get_aliases()
+	settings = {}
+	for alias in aliases:
+		if alias.startswith(f'settings_{tp}_{idx}_'):
+			settings[alias.split('_')[3]] = dpg.get_value(alias)
+	return settings
+
+
 # return a dictionary with all stream inputs
 def get_streams():
 	streams_grp = 'streams'
@@ -46,17 +53,13 @@ def get_streams():
 			'port': int(port),
 		}
 
-		#extra settings
-		if stype=='MediaPipe Hands':
-			stream['apply_filter'] = dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[0], 1)[1])
-			stream['smoothing_factor'] = dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[0], 1)[3])
-			stream['beta'] = change_range(stream['smoothing_factor'], 0, 100, 100, 0.5)
-			stream['ensure_hand_count'] = int(dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[1], 1)[1]))+1
-		if stype=='MediaPipe Body':
-			stream['apply_filter'] = dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[0], 1)[1])
-			stream['smoothing_factor'] = dpg.get_value(dpg.get_item_children(dpg.get_item_children(dpg.get_item_children(child, 1)[6], 1)[0], 1)[3])
-			stream['beta'] = change_range(stream['smoothing_factor'], 0, 100, 100, 0.5)
-
+		# extra settings
+		stream.update(get_stream_settings(stype, i))
+		
+		# extra settings calculated
+		if stype in [st.ST_MP_HANDS, st.ST_MP_BODY]:
+			stream['beta'] = change_range(stream['smoothingFactor'], 0, 100, 100, 0.5)
+		
 		streams.append(stream)
 
 	return streams
@@ -95,7 +98,7 @@ def del_stream(sender, app_data, user_data):
 def add_stream(sender, app_data, user_data):
 	# defaults
 	streams_grp = 'streams'
-	stream_types = ['Info Dictionary', 'Webcam', 'MediaPipe Hands', 'MediaPipe Body']
+	stream_types = st.ALL
 	
 	stream_input = get_new_stream_input()
 	index = stream_input['index']
@@ -132,30 +135,37 @@ def add_stream(sender, app_data, user_data):
 			dpg.set_value(tag, stream_types[0])
 
 		# extra settings per stream type
-		with dpg.group(tag=f'Info Dictionary settings {index}', indent=20):
-			dpg.add_spacer(height=1)
-		with dpg.group(tag=f'Webcam settings {index}', indent=20, show=False):
-			dpg.add_spacer(height=1)
-		with dpg.group(tag=f'MediaPipe Hands settings {index}', indent=20, show=False):
-			with dpg.group(horizontal=True):
-				dpg.add_text('Motion filter:'.ljust(20), color=(245, 212, 66))
-				dpg.add_checkbox(tag=f'settings_mphands_applyfilter{index}', default_value=True)
-				with dpg.tooltip(parent=dpg.last_item()):
-					dpg.add_text('Applies a "One-Euro" smoothing filter over the input signal.', wrap=200)
-				dpg.add_slider_float(tag=f'settings_mphands_filterbeta{index}', default_value=60, min_value=0, max_value=100, width=120)
-			with dpg.group(horizontal=True):
-				dpg.add_text('Ensure both hands:'.ljust(20), color=(245, 212, 66))
-				dpg.add_checkbox(tag=f'settings_mphands_ensureBoth{index}', default_value=False)
+		for t in st.ALL:
 
-		with dpg.group(tag=f'MediaPipe Body settings {index}', indent=20, show=False):
-			with dpg.group(horizontal=True):
-				dpg.add_text('Motion filter:', color=(245, 212, 66))
-				dpg.add_checkbox(tag=f'settings_mbodies_applyfilter{index}', default_value=True)
-				with dpg.tooltip(parent=dpg.last_item()):
-					dpg.add_text('Applies a "One-Euro" smoothing filter over the input signal.', wrap=200)
-				dpg.add_slider_float(tag=f'settings_mbodies_filterbeta{index}', default_value=60, min_value=0, max_value=100, width=120)
-			
+			if t in [st.ST_INFO_DICT, st.ST_WEBCAM]:
+				with dpg.group(tag=f'{t} settings {index}', indent=20):
+					dpg.add_spacer(height=1)
+
+			elif t == st.ST_MP_HANDS:
+				with dpg.group(tag=f'{t} settings {index}', indent=20, show=False):
+					with dpg.group(horizontal=True):
+						dpg.add_text('Motion filter:'.ljust(20), color=(245, 212, 66))
+						dpg.add_checkbox(tag=f'settings_{t}_{index}_applyFilter', default_value=True)
+						with dpg.tooltip(parent=dpg.last_item()): dpg.add_text('Applies a "One-Euro" smoothing filter over the input signal.', wrap=200)
+						dpg.add_slider_float(tag=f'settings_{t}_{index}_smoothingFactor', default_value=60, min_value=0, max_value=100, width=120)
+					with dpg.group(horizontal=True):
+						dpg.add_text('Ensure both hands:'.ljust(20), color=(245, 212, 66))
+						dpg.add_checkbox(tag=f'settings_{t}_{index}_ensureHands', default_value=False)
+
+			elif t == st.ST_MP_BODY:
+				with dpg.group(tag=f'{t} settings {index}', indent=20, show=False):
+					with dpg.group(horizontal=True):
+						dpg.add_text('Motion filter:', color=(245, 212, 66))
+						dpg.add_checkbox(tag=f'settings_{t}_{index}_applyFilter', default_value=True)
+						with dpg.tooltip(parent=dpg.last_item()): dpg.add_text('Applies a "One-Euro" smoothing filter over the input signal.', wrap=200)
+						dpg.add_slider_float(tag=f'settings_{t}_{index}_smoothingFactor', default_value=60, min_value=0, max_value=100, width=120)
+					
 		dpg.add_separator()
+
+# change specific webcam config control (linux only!) using v4l2-ctl in a subprocess
+def set_webcam_custom_config(ctrl, val):
+	cmd = f'v4l2-ctl --set-ctrl {ctrl}={val}'
+	subprocess.call(cmd.split())
 
 # change webcam config control (linux only!) using v4l2-ctl in a subprocess
 def set_webcam_config(sender, app_data, user_data):

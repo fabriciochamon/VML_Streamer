@@ -37,17 +37,18 @@ with dpg.window(tag='mainwin') as mainwin:
 	
 	# webcam config controls (for linux only!)
 	if platform.system()=='Linux':
-		dpg.add_text('Camera controls:')
-		config_controls = ['gain', 'brightness', 'saturation']		
-		for ctrl in config_controls:			
-			with dpg.group(horizontal=True):
-				dpg.add_text(ctrl.capitalize().ljust(15)+':')
-				# check if webcam device is available and set control value, ignore otherwise
-				try:
-					ctrl_val = dpg_callback.get_webcam_config(ctrl)
-					dpg.add_slider_float(default_value=ctrl_val, min_value=0, max_value=ctrl_val*2, width=120, callback=dpg_callback.set_webcam_config, user_data=ctrl)
-				except:
-					pass
+		dpg_callback.set_webcam_custom_config('auto_exposure', 1)
+		with dpg.collapsing_header(label='Camera controls'):
+			config_controls = ['exposure_time_absolute', 'gain', 'brightness', 'saturation']		
+			for ctrl in config_controls:			
+				with dpg.group(horizontal=True):
+					dpg.add_text(ctrl.replace('_', ' ').capitalize().rjust(25)+':')
+					# check if webcam device is available and set control value, ignore otherwise
+					try:
+						ctrl_val = dpg_callback.get_webcam_config(ctrl)
+						dpg.add_slider_float(default_value=ctrl_val, min_value=0, max_value=ctrl_val*2, width=120, callback=dpg_callback.set_webcam_config, user_data=ctrl)
+					except:
+						pass
 		dpg.add_spacer(height=15)
 	
 	# "add stream" button
@@ -60,8 +61,8 @@ dpg.bind_item_handler_registry(mainwin, window_handler)
 # DPG top menu bar
 with dpg.viewport_menu_bar() as mainmenu:
 	with dpg.menu(label='Settings'):
-		dpg.add_checkbox(tag='flip', label='Flip horizontal', default_value=True)
 		dpg.add_checkbox(tag='always_on_top', label='Always on top', default_value=True, callback=dpg_callback.always_on_top)
+		dpg.add_checkbox(tag='flip', label='Flip video horizontal', default_value=True)
 		dpg.configure_viewport(0, always_on_top=dpg.get_value(dpg.last_item()))
 		#with dpg.menu(label='Capture device:'):
 		#	dpg.add_radio_button(items=list(range(10)), default_value='0', callback=change_capture_device)
@@ -154,13 +155,13 @@ if vs.isOpened():
 					ts[i] = int(vs.stream.get(cv2.CAP_PROP_POS_MSEC))
 					if ts[i] > ts_last[i]: 
 						ts_last[i] = ts[i]
-						hands.apply_filter = stream['apply_filter']
+						hands.apply_filter = stream['applyFilter']
 						hands.one_euro_beta = stream['beta']
 						hands.image = mp.Image(mp.ImageFormat.SRGB, data=data)
 						hands.detect(ts[i])	
 					
 					# send data
-					ensure_hand_count = stream['ensure_hand_count'] if 'ensure_hand_count' in stream.keys() else 1
+					ensure_hand_count = int(stream['ensureHands'])+1 if 'ensureHands' in stream.keys() else 1
 					if len(hands.joints.keys())>=ensure_hand_count:
 						display_image = hands.display_image
 						cv2.cvtColor(display_image, cv2.COLOR_RGB2BGR)
@@ -181,7 +182,7 @@ if vs.isOpened():
 					ts[i] = int(vs.stream.get(cv2.CAP_PROP_POS_MSEC))
 					if ts[i] > ts_last[i]: 
 						ts_last[i] = ts[i]
-						bodies.apply_filter = stream['apply_filter']
+						bodies.apply_filter = stream['applyFilter']
 						bodies.one_euro_beta = stream['beta']
 						bodies.image = mp.Image(mp.ImageFormat.SRGB, data=data)
 						bodies.detect(ts[i])	
