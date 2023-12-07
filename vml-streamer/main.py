@@ -101,10 +101,10 @@ if vs.isOpened():
 	counter = 0
 	fps_update_rate_sec = 1 # update fps at every 1 second
 	
-	# Main UI loop
+	# DPG Main UI loop
 	while dpg.is_dearpygui_running():
-		
-		# read webcam frame
+
+		# CV read webcam frame
 		success, frame = vs.read()
 
 		if success:
@@ -126,7 +126,7 @@ if vs.isOpened():
 			for i, stream in enumerate(streams):
 
 				addr_port = (stream['address'], stream['port'])
-
+				
 				# INFO DICT
 				if stream['type']=='Info Dictionary':
 					info['streams'] = [
@@ -195,8 +195,8 @@ if vs.isOpened():
 						data_last[i] = bodies.joints
 					else:
 						if i in data_last: skt.sendto(json.dumps(data_last[i]).encode(), addr_port)
-
-			# print FPS
+			
+			# Overlay FPS on webcam image
 			counter+=1
 			if (time.time() - start_time) > fps_update_rate_sec:
 				fps = counter / (time.time() - start_time)

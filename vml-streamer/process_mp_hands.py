@@ -46,10 +46,10 @@ class MediaPipe_Hands:
 			hand_world_landmarks = result.hand_world_landmarks[i]
 			handedness = result.handedness[i]
 			
-			# convert to proper 3d world coordinates
 			###################################################################################################
+			# convert to proper 3d world coordinates
 			# thanks to Fryderyk Kogl
-			# for providing this code: https://github.com/google/mediapipe/issues/2199#issuecomment-1172971018
+			# for providing the code: https://github.com/google/mediapipe/issues/2199#issuecomment-1172971018
 			###################################################################################################
 			model_points = np.float32([[-l.x, -l.y, -l.z] for l in hand_world_landmarks])
 			image_points = np.float32([[l.x * self.frame_width, l.y * self.frame_height] for l in hand_landmarks])

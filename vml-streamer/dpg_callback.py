@@ -23,43 +23,58 @@ def always_on_top(sender):
 
 # display extra settings for chosen stream type
 def show_extra_settings(sender, app_data, user_data):
-	dpg.hide_item(f'Info Dictionary settings {user_data}')
-	dpg.hide_item(f'Webcam settings {user_data}')
-	dpg.hide_item(f'MediaPipe Hands settings {user_data}')
-	dpg.hide_item(f'MediaPipe Body settings {user_data}')
-	dpg.show_item(f'{dpg.get_value(sender)} settings {user_data}')
+	for t in st.ALL:
+		tag_settings_hide = f'{user_data}_{t}_settings'
+		dpg.hide_item(tag_settings_hide)
+	dpg.show_item(f'{user_data}_{dpg.get_value(sender)}_settings')
+
+# rebuild stream list indices after some stream is deleted
+def rebuild_indices():
+	streams_grp = 'streams'
+	aliases = dpg.get_aliases()
+	for i, child in enumerate(dpg.get_item_children(streams_grp, 1)):
+		cur_index  = str(i)
+		orig_index = dpg.get_value(dpg.get_item_children(child, 1)[0])
+		for old_alias in aliases:
+			if old_alias.startswith(f'{orig_index}_'):
+				new_alias = '_'.join(old_alias.split('_')[1:])
+				new_alias = cur_index+'_'+new_alias
+				item_id = dpg.get_alias_id(old_alias)
+				if dpg.does_alias_exist(new_alias): dpg.remove_alias(new_alias)
+				dpg.add_alias(new_alias, item_id)
+				dpg.set_item_alias(item_id, new_alias)
 
 # get all custom settings for a specific stream type and index
 def get_stream_settings(tp, idx):
 	aliases = dpg.get_aliases()
 	settings = {}
 	for alias in aliases:
-		if alias.startswith(f'settings_{tp}_{idx}_'):
+		if alias.startswith(f'{idx}_{tp}_settings_'):
 			settings[alias.split('_')[3]] = dpg.get_value(alias)
 	return settings
-
 
 # return a dictionary with all stream inputs
 def get_streams():
 	streams_grp = 'streams'
 	streams = []
 	for i, child in enumerate(dpg.get_item_children(streams_grp, 1)):
-		address = dpg.get_value(dpg.get_item_children(dpg.get_item_children(child, 1)[2], 1)[1])
-		port    = dpg.get_value(dpg.get_item_children(dpg.get_item_children(child, 1)[2], 1)[3])
-		stype   = dpg.get_value(dpg.get_item_children(dpg.get_item_children(child, 1)[3], 1)[1])
+		address = dpg.get_value(f'{i}_stream_address')
+		port    = dpg.get_value(f'{i}_stream_port')
+		stype   = dpg.get_value(f'{i}_stream_type')
+
 		stream = {
 			'type': stype,
 			'address': address,
 			'port': int(port),
 		}
-
+	
 		# extra settings
 		stream.update(get_stream_settings(stype, i))
 		
 		# extra settings calculated
 		if stype in [st.ST_MP_HANDS, st.ST_MP_BODY]:
 			stream['beta'] = change_range(stream['smoothingFactor'], 0, 100, 100, 0.5)
-		
+
 		streams.append(stream)
 
 	return streams
@@ -68,28 +83,26 @@ def get_streams():
 def get_new_stream_input():
 	streams_grp = 'streams'
 	ports = [11110]
-	indices = [-1]
-	for i, child in enumerate(dpg.get_item_children(streams_grp, 1)):
-		alias = dpg.get_item_alias(child)
-		index = int(alias[6:])
-		indices.append(index)
-		item = dpg.get_item_children(dpg.get_item_children(child, 1)[2], 1)[3]
+	stream_group = dpg.get_item_children(streams_grp, 1)
+	for i, child in enumerate(stream_group):
+		item = dpg.get_item_children(dpg.get_item_children(child, 1)[3], 1)[3]
 		port = dpg.get_value(item)
 		ports.append(int(port))
 	
 	ret = {
 		'port': max(ports)+1,
-		'index': max(indices)+1,
+		'index': len(stream_group),
 	}
 	return ret
 
 # remove a stream
 def del_stream(sender, app_data, user_data):
-	global ts, ts_last, data_last
+	global ts, ts_last, data_last	
 	streams_grp = 'streams'
 	index = user_data
-	stream = f'stream{index}'
+	stream = f'{index}_stream_input'
 	dpg.delete_item(stream)	
+	rebuild_indices()
 	ts = {}
 	ts_last = {}
 	data_last = {}
@@ -102,9 +115,12 @@ def add_stream(sender, app_data, user_data):
 	
 	stream_input = get_new_stream_input()
 	index = stream_input['index']
-	port = stream_input['port']
+	port  = stream_input['port']
 
-	with dpg.group(parent='streams', tag=f'stream{index}') as grp:
+	with dpg.group(parent='streams', tag=f'{index}_stream_input') as grp:
+
+		# keep track of item index
+		dpg.add_input_text(default_value=index, show=False)
 		
 		# title
 		dpg.add_spacer(height=5)
@@ -116,20 +132,20 @@ def add_stream(sender, app_data, user_data):
 			
 		with dpg.group(horizontal=True):
 			# ip address
-			tag = f'stream_address{index}'
+			tag = f'{index}_stream_address'
 			dpg.add_text('Address:')
 			dpg.add_input_text(tag=tag, width=120)
 			dpg.set_value(tag, '127.0.0.1')
 
 			# port
-			tag = f'stream_port{index}'
+			tag = f'{index}_stream_port'
 			dpg.add_text('Port:')
 			dpg.add_input_text(tag=tag, width=60)
 			dpg.set_value(tag, str(port))
 
 		with dpg.group(horizontal=True):
 			# stream type
-			tag = f'stream_type{index}'
+			tag = f'{index}_stream_type'
 			dpg.add_text('Type:')
 			dpg.add_combo(items=stream_types, tag=tag, width=255, callback=show_extra_settings, user_data=index)
 			dpg.set_value(tag, stream_types[0])
@@ -137,28 +153,30 @@ def add_stream(sender, app_data, user_data):
 		# extra settings per stream type
 		for t in st.ALL:
 
+			tag_settings = f'{index}_{t}_settings'
+
 			if t in [st.ST_INFO_DICT, st.ST_WEBCAM]:
-				with dpg.group(tag=f'{t} settings {index}', indent=20):
+				with dpg.group(tag=tag_settings, indent=20):
 					dpg.add_spacer(height=1)
 
 			elif t == st.ST_MP_HANDS:
-				with dpg.group(tag=f'{t} settings {index}', indent=20, show=False):
+				with dpg.group(tag=tag_settings, indent=20, show=False):
 					with dpg.group(horizontal=True):
 						dpg.add_text('Motion filter:'.ljust(20), color=(245, 212, 66))
-						dpg.add_checkbox(tag=f'settings_{t}_{index}_applyFilter', default_value=True)
+						dpg.add_checkbox(tag=f'{tag_settings}_applyFilter', default_value=True)
 						with dpg.tooltip(parent=dpg.last_item()): dpg.add_text('Applies a "One-Euro" smoothing filter over the input signal.', wrap=200)
-						dpg.add_slider_float(tag=f'settings_{t}_{index}_smoothingFactor', default_value=60, min_value=0, max_value=100, width=120)
+						dpg.add_slider_float(tag=f'{tag_settings}_smoothingFactor', default_value=60, min_value=0, max_value=100, width=120)
 					with dpg.group(horizontal=True):
 						dpg.add_text('Ensure both hands:'.ljust(20), color=(245, 212, 66))
-						dpg.add_checkbox(tag=f'settings_{t}_{index}_ensureHands', default_value=False)
+						dpg.add_checkbox(tag=f'{tag_settings}_ensureHands', default_value=False)
 
 			elif t == st.ST_MP_BODY:
-				with dpg.group(tag=f'{t} settings {index}', indent=20, show=False):
+				with dpg.group(tag=tag_settings, indent=20, show=False):
 					with dpg.group(horizontal=True):
 						dpg.add_text('Motion filter:', color=(245, 212, 66))
-						dpg.add_checkbox(tag=f'settings_{t}_{index}_applyFilter', default_value=True)
+						dpg.add_checkbox(tag=f'{tag_settings}_applyFilter', default_value=True)
 						with dpg.tooltip(parent=dpg.last_item()): dpg.add_text('Applies a "One-Euro" smoothing filter over the input signal.', wrap=200)
-						dpg.add_slider_float(tag=f'settings_{t}_{index}_smoothingFactor', default_value=60, min_value=0, max_value=100, width=120)
+						dpg.add_slider_float(tag=f'{tag_settings}_smoothingFactor', default_value=60, min_value=0, max_value=100, width=120)
 					
 		dpg.add_separator()
 
