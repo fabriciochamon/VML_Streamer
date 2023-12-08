@@ -1,9 +1,12 @@
-import time, cv2, socket, json, platform, numpy as np
+import sys, time, cv2, socket, json, platform, numpy as np
 from webcam_stream import WebcamVideoStream
 import mediapipe as mp
 import dearpygui.dearpygui as dpg
 import dpg_callback
 import process_mp_hands, process_mp_body
+
+# PyInstaller load splash screen
+if getattr(sys, 'frozen', False): import pyi_splash
 
 # CV VideoCapture resolution
 frame_width  = 320
@@ -82,11 +85,14 @@ ts={}
 ts_last={}
 data_last={}
 
-if vs.isOpened():
+# MediaPipe init
+hands  = process_mp_hands.MediaPipe_Hands(frame_width, frame_height)
+bodies = process_mp_body.MediaPipe_Bodies(frame_width, frame_height)
 
-	# MediaPipe init
-	hands  = process_mp_hands.MediaPipe_Hands(frame_width, frame_height)
-	bodies = process_mp_body.MediaPipe_Bodies(frame_width, frame_height)
+# PyInstaller close splash screen
+if getattr(sys, 'frozen', False): pyi_splash.close()
+
+if vs.isOpened():
 
 	# Info dict init (static data: width, height, etc)
 	info = {}

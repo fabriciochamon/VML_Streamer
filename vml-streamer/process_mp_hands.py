@@ -6,6 +6,7 @@ from mediapipe.framework.formats import landmark_pb2
 from mediapipe import solutions
 from mediapipe.tasks import python as tasks
 from mediapipe.tasks.python import vision
+import resources
 
 class MediaPipe_Hands:
 	def __init__(self, frame_width, frame_height):
@@ -29,7 +30,7 @@ class MediaPipe_Hands:
 		self.mp_data_filter = {}
 		self.running_mode = vision.RunningMode.LIVE_STREAM
 		delegate = tasks.BaseOptions.Delegate.GPU if platform.system()=='Linux' else tasks.BaseOptions.Delegate.CPU
-		self.base_options = tasks.BaseOptions(model_asset_path='mediapipe_models/hand_landmarker.task', delegate=delegate)
+		self.base_options = tasks.BaseOptions(model_asset_path=resources.getPath('mediapipe_models/hand_landmarker.task'), delegate=delegate)
 		self.options = vision.HandLandmarkerOptions(base_options=self.base_options, min_hand_detection_confidence=0.8, min_tracking_confidence=0.5, num_hands=2, running_mode=self.running_mode, result_callback=self.on_detection)
 		self.detector = vision.HandLandmarker.create_from_options(self.options)
 		self.joints = {}
