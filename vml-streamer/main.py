@@ -198,7 +198,7 @@ if vs.isOpened():
 						display_image = bodies.display_image
 						cv2.cvtColor(display_image, cv2.COLOR_RGB2BGR)
 						skt.sendto(json.dumps(bodies.joints).encode(), addr_port)
-						data_last[i] = bodies.joints
+						data_last[i] = bodies.joints.copy()
 					else:
 						if i in data_last: skt.sendto(json.dumps(data_last[i]).encode(), addr_port)
 			

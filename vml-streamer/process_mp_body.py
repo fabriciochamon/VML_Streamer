@@ -45,6 +45,7 @@ class MediaPipe_Bodies:
 
 			# get landmarks
 			pose_world_landmarks = result.pose_world_landmarks[i]
+
 			
 			###################################################################################################
 			# convert to proper 3d world coordinates
@@ -70,8 +71,8 @@ class MediaPipe_Bodies:
 					solutions.pose.POSE_CONNECTIONS,
 					solutions.drawing_styles.get_default_pose_landmarks_style(),
 					)
+				
 			
-			'''
 			# populate body dict
 			pose_name = f'Body{i}'
 			self.joints[pose_name] = []
@@ -79,9 +80,6 @@ class MediaPipe_Bodies:
 			
 				# apply one-euro-filter to smooth signal
 				for m in range(3):
-					print(f'{pose_name}{n}{m}')
-					print(lm.x)
-					print(type(lm))
 					self.filtered_vals[f'{pose_name}{n}{m}'] = lm[m]	
 
 
@@ -107,7 +105,7 @@ class MediaPipe_Bodies:
 						'z':self.filtered_vals[f'{pose_name}{n}2'],
 					}
 				)
-			'''
+			
 			
 
 	def detect(self, timestamp):
