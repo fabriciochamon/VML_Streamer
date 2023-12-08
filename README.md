@@ -1,3 +1,7 @@
+<!-- Splash logo
+![VML Streamer Splash](assets/images/vml_streamer_splash.png)
+-->
+
 # VML_Streamer
 Vision and Machine Learning data streamer for Houdini
 
