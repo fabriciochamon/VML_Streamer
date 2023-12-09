@@ -72,7 +72,7 @@ def get_streams():
 		stream.update(get_stream_settings(stype, i))
 		
 		# extra settings calculated
-		if stype in [st.ST_MP_HANDS, st.ST_MP_BODY]:
+		if stype in [st.ST_MP_HANDS, st.ST_MP_BODY, st.ST_MP_FACE]:
 			stream['beta'] = change_range(stream['smoothingFactor'], 0, 100, 100, 0.5)
 
 		streams.append(stream)
@@ -172,6 +172,14 @@ def add_stream(sender, app_data, user_data):
 
 			elif t == st.ST_MP_BODY:
 				with dpg.group(tag=tag_settings, indent=20, show=False):
+					with dpg.group(horizontal=True):
+						dpg.add_text('Motion filter:', color=(245, 212, 66))
+						dpg.add_checkbox(tag=f'{tag_settings}_applyFilter', default_value=True)
+						with dpg.tooltip(parent=dpg.last_item()): dpg.add_text('Applies a "One-Euro" smoothing filter over the input signal.', wrap=200)
+						dpg.add_slider_float(tag=f'{tag_settings}_smoothingFactor', default_value=60, min_value=0, max_value=100, width=120)
+
+			elif t == st.ST_MP_FACE:
+				with dpg.group(tag=tag_settings, indent=20):
 					with dpg.group(horizontal=True):
 						dpg.add_text('Motion filter:', color=(245, 212, 66))
 						dpg.add_checkbox(tag=f'{tag_settings}_applyFilter', default_value=True)

@@ -3,7 +3,8 @@ from webcam_stream import WebcamVideoStream
 import mediapipe as mp
 import dearpygui.dearpygui as dpg
 import dpg_callback
-import process_mp_hands, process_mp_body
+import process_mp_hands, process_mp_body, process_mp_face
+import stream_types as st
 
 # PyInstaller load splash screen
 if getattr(sys, 'frozen', False): import pyi_splash
@@ -52,6 +53,7 @@ with dpg.window(tag='mainwin') as mainwin:
 						dpg.add_slider_float(default_value=ctrl_val, min_value=0, max_value=ctrl_val*2, width=120, callback=dpg_callback.set_webcam_config, user_data=ctrl)
 					except:
 						pass
+
 		dpg.add_spacer(height=15)
 	
 	# "add stream" button
@@ -88,6 +90,7 @@ data_last={}
 # MediaPipe init
 hands  = process_mp_hands.MediaPipe_Hands(frame_width, frame_height)
 bodies = process_mp_body.MediaPipe_Bodies(frame_width, frame_height)
+faces  = process_mp_face.MediaPipe_Faces(frame_width, frame_height)
 
 # PyInstaller close splash screen
 if getattr(sys, 'frozen', False): pyi_splash.close()
@@ -134,7 +137,7 @@ if vs.isOpened():
 				addr_port = (stream['address'], stream['port'])
 				
 				# INFO DICT
-				if stream['type']=='Info Dictionary':
+				if stream['type'] == st.ST_INFO_DICT:
 					info['streams'] = [
 							{
 								'type':    st['type'],
@@ -146,11 +149,11 @@ if vs.isOpened():
 					skt.sendto(json.dumps(info).encode(), addr_port)
 			
 				# WEBCAM DATA
-				if stream['type']=='Webcam':
+				if stream['type'] == st.ST_WEBCAM:
 					skt.sendto(img_jpg.tobytes(), addr_port)
 
 				# MEDIAPIPE (HANDS)
-				if stream['type']=='MediaPipe Hands':
+				if stream['type'] == st.ST_MP_HANDS:
 					
 					# init timestamp data
 					if i not in ts.keys(): 
@@ -177,7 +180,7 @@ if vs.isOpened():
 						if i in data_last: skt.sendto(json.dumps(data_last[i]).encode(), addr_port)
 					
 				# MEDIAPIPE (BODY)
-				if stream['type']=='MediaPipe Body':
+				if stream['type'] == st.ST_MP_BODY:
 					
 					# init timestamp data
 					if i not in ts.keys(): 
@@ -199,6 +202,33 @@ if vs.isOpened():
 						cv2.cvtColor(display_image, cv2.COLOR_RGB2BGR)
 						skt.sendto(json.dumps(bodies.joints).encode(), addr_port)
 						data_last[i] = bodies.joints.copy()
+					else:
+						if i in data_last: skt.sendto(json.dumps(data_last[i]).encode(), addr_port)
+
+				# MEDIAPIPE (FACE)
+				if stream['type'] == st.ST_MP_FACE:
+					
+					# init timestamp data
+					if i not in ts.keys(): 
+						ts[i] = 0
+						ts_last[i] = -1
+					
+					# run detection
+					ts[i] = int(vs.stream.get(cv2.CAP_PROP_POS_MSEC))
+					if ts[i] > ts_last[i]: 
+						ts_last[i] = ts[i]
+						faces.apply_filter = stream['applyFilter']
+						faces.one_euro_beta = stream['beta']
+						faces.image = mp.Image(mp.ImageFormat.SRGB, data=data)
+						faces.detect(ts[i])	
+					
+					# send data
+					#if len(faces.joints.keys())>=0:
+					if True:
+						display_image = faces.display_image
+						cv2.cvtColor(display_image, cv2.COLOR_RGB2BGR)
+						skt.sendto(json.dumps(faces.joints).encode(), addr_port)
+						data_last[i] = faces.joints.copy()
 					else:
 						if i in data_last: skt.sendto(json.dumps(data_last[i]).encode(), addr_port)
 			

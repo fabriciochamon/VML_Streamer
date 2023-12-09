@@ -46,7 +46,6 @@ class MediaPipe_Bodies:
 			# get landmarks
 			pose_world_landmarks = result.pose_world_landmarks[i]
 
-			
 			###################################################################################################
 			# convert to proper 3d world coordinates
 			# thanks to Fryderyk Kogl
@@ -76,6 +75,8 @@ class MediaPipe_Bodies:
 			# populate body dict
 			pose_name = f'Body{i}'
 			self.joints[pose_name] = []
+
+			# pose with camera projection
 			for n, lm in enumerate(world_points):
 			
 				# apply one-euro-filter to smooth signal
@@ -95,7 +96,6 @@ class MediaPipe_Bodies:
 									self.filtered_vals[f'{pose_name}{n}{m}'] = lm[m]	
 							except:
 								self.filtered_vals[f'{pose_name}{n}{m}'] = lm[m]	
-							
 				
 				# set dict
 				self.joints[pose_name].append(
@@ -106,7 +106,64 @@ class MediaPipe_Bodies:
 					}
 				)
 			
+			'''
+			# pose with world landmarkers only (no projection!)
+			for n, lm in enumerate(pose_world_landmarks):
 			
+				# apply one-euro-filter to smooth signal
+				self.filtered_vals[f'{pose_name}{n}0'] = lm.x	
+				self.filtered_vals[f'{pose_name}{n}1'] = lm.y
+				self.filtered_vals[f'{pose_name}{n}2'] = lm.z
+
+
+				if self.apply_filter:
+					
+					if f'{pose_name}{n}0' not in self.mp_data_filter.keys():
+						self.mp_data_filter[f'{pose_name}{n}0'] = OneEuroFilter(self.iteration, lm.x, min_cutoff=self.one_euro_min_cutoff, beta=self.one_euro_beta)
+						self.filtered_vals[f'{pose_name}{n}0'] = lm.x							
+					else:
+						try:
+							self.filtered_vals[f'{pose_name}{n}0'] = self.mp_data_filter[f'{pose_name}{n}0'](self.iteration, lm.x)
+							if np.isnan(self.filtered_vals[f'{pose_name}{n}0']):
+								self.mp_data_filter[f'{pose_name}{n}0'] = OneEuroFilter(self.iteration, lm.x, min_cutoff=self.one_euro_min_cutoff, beta=self.one_euro_beta)
+								self.filtered_vals[f'{pose_name}{n}0'] = lm.x	
+						except:
+							self.filtered_vals[f'{pose_name}{n}0'] = lm.x	
+
+					if f'{pose_name}{n}1' not in self.mp_data_filter.keys():
+						self.mp_data_filter[f'{pose_name}{n}1'] = OneEuroFilter(self.iteration, lm.y, min_cutoff=self.one_euro_min_cutoff, beta=self.one_euro_beta)
+						self.filtered_vals[f'{pose_name}{n}1'] = lm.y							
+					else:
+						try:
+							self.filtered_vals[f'{pose_name}{n}1'] = self.mp_data_filter[f'{pose_name}{n}1'](self.iteration, lm.y)
+							if np.isnan(self.filtered_vals[f'{pose_name}{n}1']):
+								self.mp_data_filter[f'{pose_name}{n}1'] = OneEuroFilter(self.iteration, lm.y, min_cutoff=self.one_euro_min_cutoff, beta=self.one_euro_beta)
+								self.filtered_vals[f'{pose_name}{n}1'] = lm.y	
+						except:
+							self.filtered_vals[f'{pose_name}{n}1'] = lm.y	
+
+					if f'{pose_name}{n}2' not in self.mp_data_filter.keys():
+						self.mp_data_filter[f'{pose_name}{n}2'] = OneEuroFilter(self.iteration, lm.z, min_cutoff=self.one_euro_min_cutoff, beta=self.one_euro_beta)
+						self.filtered_vals[f'{pose_name}{n}2'] = lm.z							
+					else:
+						try:
+							self.filtered_vals[f'{pose_name}{n}2'] = self.mp_data_filter[f'{pose_name}{n}2'](self.iteration, lm.z)
+							if np.isnan(self.filtered_vals[f'{pose_name}{n}2']):
+								self.mp_data_filter[f'{pose_name}{n}2'] = OneEuroFilter(self.iteration, lm.z, min_cutoff=self.one_euro_min_cutoff, beta=self.one_euro_beta)
+								self.filtered_vals[f'{pose_name}{n}2'] = lm.z	
+						except:
+							self.filtered_vals[f'{pose_name}{n}2'] = lm.z	
+						
+				
+				# set dict
+				self.joints[pose_name].append(
+					{
+						'x':self.filtered_vals[f'{pose_name}{n}0'],
+						'y':self.filtered_vals[f'{pose_name}{n}1'],
+						'z':self.filtered_vals[f'{pose_name}{n}2'],
+					}
+				)
+			'''
 
 	def detect(self, timestamp):
 		self.detector.detect_async(image=self.image, timestamp_ms=timestamp)
