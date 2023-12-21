@@ -109,6 +109,11 @@ if vs.isOpened():
 	start_time = time.time()
 	counter = 0
 	fps_update_rate_sec = 1 # update fps at every 1 second
+
+	# per stream counters (used when "cv2.CAP_PROP_POS_MSEC" is unavailable!)
+	counter_mphands  = 0
+	counter_mpbody   = 0
+	counter_mpface   = 0
 	
 	# DPG Main UI loop
 	while dpg.is_dearpygui_running():
@@ -154,20 +159,22 @@ if vs.isOpened():
 
 				# MEDIAPIPE (HANDS)
 				if stream['type'] == st.ST_MP_HANDS:
-					
+
 					# init timestamp data
 					if i not in ts.keys(): 
 						ts[i] = 0
 						ts_last[i] = -1
 					
 					# run detection
-					ts[i] = int(vs.stream.get(cv2.CAP_PROP_POS_MSEC))
+					pos_msec = int(vs.stream.get(cv2.CAP_PROP_POS_MSEC))
+					ts[i] = pos_msec if pos_msec!=-1 else counter_mphands
 					if ts[i] > ts_last[i]: 
 						ts_last[i] = ts[i]
 						hands.apply_filter = stream['applyFilter']
 						hands.one_euro_beta = stream['beta']
 						hands.image = mp.Image(mp.ImageFormat.SRGB, data=data)
 						hands.detect(ts[i])	
+						counter_mphands+=1
 					
 					# send data
 					ensure_hand_count = int(stream['ensureHands'])+1 if 'ensureHands' in stream.keys() else 1
@@ -188,13 +195,15 @@ if vs.isOpened():
 						ts_last[i] = -1
 
 					# run detection
-					ts[i] = int(vs.stream.get(cv2.CAP_PROP_POS_MSEC))
+					pos_msec = int(vs.stream.get(cv2.CAP_PROP_POS_MSEC))
+					ts[i] = pos_msec if pos_msec!=-1 else counter_mpbody
 					if ts[i] > ts_last[i]: 
 						ts_last[i] = ts[i]
 						bodies.apply_filter = stream['applyFilter']
 						bodies.one_euro_beta = stream['beta']
 						bodies.image = mp.Image(mp.ImageFormat.SRGB, data=data)
 						bodies.detect(ts[i])	
+						counter_mpbody+=1
 
 					# send data
 					if len(bodies.joints.keys())>0:
@@ -214,13 +223,15 @@ if vs.isOpened():
 						ts_last[i] = -1
 					
 					# run detection
-					ts[i] = int(vs.stream.get(cv2.CAP_PROP_POS_MSEC))
+					pos_msec = int(vs.stream.get(cv2.CAP_PROP_POS_MSEC))
+					ts[i] = pos_msec if pos_msec!=-1 else counter_mpface
 					if ts[i] > ts_last[i]: 
 						ts_last[i] = ts[i]
 						faces.apply_filter = stream['applyFilter']
 						faces.one_euro_beta = stream['beta']
 						faces.image = mp.Image(mp.ImageFormat.SRGB, data=data)
 						faces.detect(ts[i])	
+						counter_mpface+=1
 					
 					# send data
 					#if len(faces.joints.keys())>=0:
