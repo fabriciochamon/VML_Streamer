@@ -1,6 +1,33 @@
 import sys, subprocess
 import dearpygui.dearpygui as dpg
+import numpy as np
 import stream_types as st
+import platform
+
+# recreates raw texture on registry
+def recreate_raw_texture(width=320, height=240):
+	
+	with dpg.mutex():
+	
+		# del image
+		if dpg.does_alias_exist('video_image'): 
+			dpg.delete_item('video_image')
+			try: dpg.remove_alias('video_image')
+			except: pass
+
+		# del texture
+		if dpg.does_alias_exist('cv_frame'): 
+			dpg.delete_item('cv_frame')
+			try: dpg.remove_alias('cv_frame')
+			except: pass
+
+		# recreate texture
+		texture_data = np.zeros(shape=(width, height, 3))
+		dpg.add_raw_texture(width, height, texture_data, format=dpg.mvFormat_Float_rgb, tag='cv_frame', parent='treg')
+
+		#recreate image
+		if dpg.does_alias_exist('video_image_parent'): 
+			dpg.add_image(texture_tag='cv_frame', tag='video_image', parent='video_image_parent')
 
 # remap value between range
 def change_range(unscaled, from_min, from_max, to_min, to_max):
@@ -16,6 +43,11 @@ def resize_img(sender, app_data, user_data):
 	if dpg.does_alias_exist(img):
 		dpg.configure_item(img, width=newW)
 		dpg.configure_item(img, height=newH)
+
+# resize viewport to specific values
+def resize_viewport(w=None, h=None):
+	if w: dpg.configure_viewport(0, width=w+18)
+	if h: dpg.configure_viewport(0, height=h)
 
 # set viewport "always on top" mode
 def always_on_top(sender):
@@ -155,7 +187,7 @@ def add_stream(sender, app_data, user_data):
 
 			tag_settings = f'{index}_{t}_settings'
 
-			if t in [st.ST_INFO_DICT, st.ST_WEBCAM]:
+			if t in [st.ST_INFO_DICT, st.ST_VIDEO]:
 				with dpg.group(tag=tag_settings, indent=20):
 					dpg.add_spacer(height=1)
 

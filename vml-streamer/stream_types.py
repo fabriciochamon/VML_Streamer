@@ -1,5 +1,5 @@
 ST_INFO_DICT = 'Info Dictionary'
-ST_WEBCAM    = 'Webcam'
+ST_VIDEO     = 'Video'
 ST_MP_HANDS  = 'MediaPipe Hands'
 ST_MP_BODY   = 'MediaPipe Body'
 ST_MP_FACE   = 'MediaPipe Face'
