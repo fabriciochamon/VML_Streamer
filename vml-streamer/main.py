@@ -83,7 +83,7 @@ with dpg.window(tag='mainwin') as mainwin:
 		dpg.add_image_button('icon_last_frame', width=playback_icon_size, height=playback_icon_size, callback=lambda: video_set_frame(vs.frames-1))
 		dpg.add_text('fps:')
 		dpg.add_input_text(tag='fps_playback', default_value='24', width=30)
-		dpg.add_slider_int(tag='video_frame', min_value=0, max_value=100, width=-1, callback=lambda sender, val: vs.set_video_frame(val))
+		dpg.add_slider_int(tag='video_frame', min_value=0, max_value=100, width=-1, callback=lambda sender, val: video_set_frame(val))
 		
 	dpg.add_spacer(height=15)
 

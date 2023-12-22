@@ -53,9 +53,6 @@ class VideoStream:
 	def isOpened(self):
 		return self.stream.isOpened()
 
-	def set_video_frame(self, frameNumber):
-		self.frameNumber = int(frameNumber)
-
 	def change_source(self, source_type='webcam', source_file=0, width=320, height=240):
 		if self.stream is not None and self.stream.isOpened(): self.stop()
 
