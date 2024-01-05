@@ -1,11 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+images = [
+    ('images/icon_first_frame.png', './images'),
+    ('images/icon_last_frame.png', './images'),
+    ('images/icon_play_pause.png', './images'),
+]
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[('./mediapipe_models/*', './mediapipe_models')],
-    datas=[],
+    datas=images,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
