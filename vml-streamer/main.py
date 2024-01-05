@@ -8,15 +8,16 @@ import process_mp_hands, process_mp_body, process_mp_face
 import stream_types as st
 import resources
 
+# Defaults
+frame_width  = 320
+frame_height = 240
+filebrowser_path = '~/Downloads/test_videos'
+
 # PyInstaller load splash screen
 if getattr(sys, 'frozen', False): import pyi_splash
 
 # Socket connection (udp)
 skt = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-
-# Default image resolution
-frame_width  = 320
-frame_height = 240
 
 # fixes segfault when deleting dpg textures on Linux
 if platform.system()=='Linux': os.environ["__GLVND_DISALLOW_PATCHING"] = '1'
@@ -98,10 +99,10 @@ dpg.bind_item_handler_registry(mainwin, window_handler)
 with dpg.viewport_menu_bar() as mainmenu:
 	with dpg.menu(label='Settings'):
 		with dpg.menu(label='Video source'):
-			file_formats = [ {'label': 'Videos', 'formats': ['mp4', 'mov', 'mkv', 'mpg', 'mpeg', 'avi', 'wmv']} ]
+			file_formats = [ {'label': 'Videos', 'formats': ['mp4', 'mov', 'mkv', 'mpg', 'mpeg', 'avi', 'wmv', 'webm']} ]
 			fb = dpge.add_file_browser(
 				label=('Open file...', 'File browser'), 
-				default_path='~',
+				default_path=filebrowser_path,
 				width=750, 
 				height=610,
 				pos=[10,30],
@@ -177,9 +178,11 @@ if vs.isOpened():
 
 			# increment video frame
 			if vs.source_type=='video' and video_playing:
-				if time.time()-video_last_time>=1/float(dpg.get_value('fps_playback')):
-					vs.frameNumber += 1
-					vs.frameNumber = vs.frameNumber%(vs.frames-1)
+				fps_pb = dpg.get_value('fps_playback')
+				if fps_pb.strip()=='': fps_pb = 30
+				if time.time()-video_last_time>=1/float(fps_pb):
+					vs.frameNumber += 1  # increment
+					vs.frameNumber = vs.frameNumber%(vs.frames-1)  # loop
 					dpg.set_value('video_frame', vs.frameNumber)
 					video_last_time = time.time()
 			
@@ -216,7 +219,7 @@ if vs.isOpened():
 						]
 					skt.sendto(json.dumps(info).encode(), addr_port)
 			
-				# VIDEO DATA
+				# VIDEO
 				if stream['type'] == st.ST_VIDEO:
 					skt.sendto(img_jpg.tobytes(), addr_port)
 
@@ -260,8 +263,6 @@ if vs.isOpened():
 					ts[i] = counter_mpbody
 					if ts[i] > ts_last[i]: 
 						ts_last[i] = ts[i]
-						bodies.apply_filter = stream['applyFilter']
-						bodies.one_euro_beta = stream['beta']
 						bodies.image = mp.Image(mp.ImageFormat.SRGB, data=data)
 						bodies.detect(ts[i])	
 						counter_mpbody+=1
