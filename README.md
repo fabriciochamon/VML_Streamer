@@ -23,7 +23,7 @@ So consider running this as an alternative to build your virtual environment:
 	venv/Scripts/activate    # on Windows
 	
 	# install modules ("pyinstaller" only needed if you'll build binaries)
-	pip install opencv-python mediapipe dearpygui pyinstaller
+	pip install opencv-python mediapipe dearpygui dearpygui_extend pyinstaller
 
 ## Running:
 
