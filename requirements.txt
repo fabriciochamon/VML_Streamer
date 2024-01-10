@@ -4,9 +4,12 @@ attrs==23.1.0
 cffi==1.16.0
 contourpy==1.2.0
 cycler==0.12.1
-dearpygui==1.10.1
+dearpygui==1.9.1
+dearpygui-extend==0.1.2
+Fileseq==1.15.2
 flatbuffers==23.5.26
 fonttools==4.46.0
+future==0.18.3
 kiwisolver==1.4.5
 matplotlib==3.8.2
 mediapipe==0.10.8
@@ -14,6 +17,7 @@ numpy==1.26.2
 opencv-contrib-python==4.8.1.78
 opencv-python==4.8.1.78
 packaging==23.2
+pefile==2023.2.7
 Pillow==10.1.0
 protobuf==3.20.3
 pycparser==2.21
@@ -21,5 +25,6 @@ pyinstaller==6.2.0
 pyinstaller-hooks-contrib==2023.10
 pyparsing==3.1.1
 python-dateutil==2.8.2
+pywin32-ctypes==0.2.2
 six==1.16.0
 sounddevice==0.4.6
