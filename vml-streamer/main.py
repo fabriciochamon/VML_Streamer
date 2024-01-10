@@ -11,7 +11,7 @@ import resources
 # Defaults
 frame_width  = 320
 frame_height = 240
-filebrowser_path = '~/Downloads/test_videos'
+filebrowser_path = '~'
 
 # PyInstaller load splash screen
 if getattr(sys, 'frozen', False): import pyi_splash

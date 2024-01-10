@@ -32,7 +32,7 @@ class VideoStream:
 				return
 
 			if self.source_type=='video': self.stream.set(cv2.CAP_PROP_POS_FRAMES, int(self.frameNumber))
-			
+
 			(self.grabbed, self.frame) = self.stream.read()
 
 			# calc fps
@@ -49,7 +49,10 @@ class VideoStream:
 
 	
 	def read(self):
-		return (self.grabbed, self.frame)
+		ret = (False, None)
+		try: ret = (self.grabbed, self.frame)
+		except: pass
+		return ret
 	
 	def stop(self):
 		self.stopped = True
