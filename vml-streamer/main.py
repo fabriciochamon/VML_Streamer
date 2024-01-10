@@ -39,24 +39,27 @@ vs = VideoStream(frame_width, frame_height).start()
 def video_play_pause():
 	global video_playing
 	video_playing = not video_playing
+
 def video_set_frame(frameNumber):
 	global vs, video_playing
 	video_playing = False
 	vs.frameNumber = frameNumber
 	dpg.set_value('video_frame', frameNumber)
+
 def video_prev_next_frame(sender, app_data, user_data):
-	if user_data=='prev':
-		vs.frameNumber -=1
-	else:
-		vs.frameNumber +=1
+	if user_data=='prev': vs.frameNumber -=1
+	else: vs.frameNumber +=1
+	dpg.set_value('video_frame', vs.frameNumber)
 	
 # DPG event handlers
 with dpg.item_handler_registry(tag='window_handler') as window_handler:
 	image_aspect = vs.height/vs.width
 	dpg.add_item_resize_handler(callback=dpg_callback.resize_img, user_data={'image_aspect':image_aspect})
+
 with dpg.handler_registry(tag='global_handler'):
     dpg.add_key_press_handler(key=dpg.mvKey_Left, callback=video_prev_next_frame, user_data='prev')
     dpg.add_key_press_handler(key=dpg.mvKey_Right, callback=video_prev_next_frame, user_data='next')
+    dpg.add_key_press_handler(key=dpg.mvKey_Up, callback=video_play_pause)
 
 # DPG UI
 with dpg.window(tag='mainwin') as mainwin:
@@ -100,7 +103,7 @@ with dpg.window(tag='mainwin') as mainwin:
 	dpg.add_button(label='Add stream', tag='add_stream', callback=dpg_callback.add_stream)
 	dpg.add_group(tag='streams')
 
-# DPG bind event handlers
+# DPG bind window event handler
 dpg.bind_item_handler_registry(mainwin, window_handler)
 
 # DPG top menu bar
@@ -155,7 +158,7 @@ if getattr(sys, 'frozen', False): pyi_splash.close()
 
 if vs.isOpened():
 
-	# FPS calc init
+	# FPS calc init (main thread)
 	fps = 30.0
 	textsize = cv2.getTextSize(f'fps: {fps}', fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=0.3, thickness=1)
 	start_time = time.time()
@@ -178,10 +181,7 @@ if vs.isOpened():
 
 		if success:
 
-			# resize to desired resolution
-			#frame = cv2.resize(frame, (frame_width, frame_height))
-
-			# flip?
+			# flip image?
 			if dpg.get_value('flip'): frame = cv2.flip(frame, 1)
 
 			# increment video frame
@@ -195,11 +195,12 @@ if vs.isOpened():
 					dpg.set_value('video_frame', vs.frameNumber)
 					video_last_time = time.time()
 			
-			# Encode image to jpg (faster streams) and BGR -> RGB
+			# Encode image to jpg (faster streams) and convert BGR -> RGB
 			img_jpg = cv2.imencode('.jpg', frame, params=[cv2.IMWRITE_JPEG_QUALITY, 85])[1]
 			data = cv2.imdecode(img_jpg, cv2.IMREAD_COLOR)
 			data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
 			display_image = data.copy()
+		
 			
 			# loop through streams
 			streams = dpg_callback.get_streams()
@@ -308,8 +309,10 @@ if vs.isOpened():
 					cv2.cvtColor(display_image, cv2.COLOR_RGB2BGR)
 					skt.sendto(json.dumps(faces.joints).encode(), addr_port)
 					data_last[i] = faces.joints.copy()
-				
-			# Overlay FPS on webcam image
+
+			# Overlay FPS over video
+			# MT = main thread
+			# CV = openCV video thread
 			counter+=1
 			if (time.time() - start_time) > fps_update_rate_sec:
 				fps = counter / (time.time() - start_time)
@@ -322,9 +325,11 @@ if vs.isOpened():
 			# DPG webcam texture update: convert to 32bit float, flatten and normalize 
 			display_image = np.asfarray(display_image.ravel(), dtype='f')
 			texture_data = np.true_divide(display_image, 255.0)
-			if dpg.does_alias_exist('cv_frame'): 
-				dpg.set_value('cv_frame', texture_data)
 			
+			if dpg.does_alias_exist('cv_frame'):
+				with dpg.mutex():
+					dpg.set_value('cv_frame', texture_data)			
+				
 		# DPG render UI (max update rate = monitor vsync)
 		dpg.render_dearpygui_frame()
 

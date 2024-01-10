@@ -27,13 +27,18 @@ class VideoStream:
 		fps_update_rate_sec = 1
 
 		while True:
+
+			# if stopped break loop
 			if self.stopped: 
 				if self.stream: self.stream.release()
 				return
 
+			# set video frame
 			if self.source_type=='video': self.stream.set(cv2.CAP_PROP_POS_FRAMES, int(self.frameNumber))
-
-			(self.grabbed, self.frame) = self.stream.read()
+			
+			# read image
+			try: (self.grabbed, self.frame) = self.stream.read()
+			except: self.grabbed=False
 
 			# calc fps
 			if self.source_type=='webcam':
@@ -46,8 +51,7 @@ class VideoStream:
 				self.fps = counter / (time.time() - start_time)
 				counter = 0
 				start_time = time.time()
-
-	
+			
 	def read(self):
 		ret = (False, None)
 		try: ret = (self.grabbed, self.frame)
@@ -97,7 +101,7 @@ class VideoStream:
 			if dpg.does_alias_exist('playback_controls'): dpg.show_item('playback_controls')
 			if dpg.does_alias_exist('camera_controls'): dpg.hide_item('camera_controls')
 			dpg.set_value('webcam_device_number', 'None')
-			
+
 		dpg_callback.recreate_raw_texture(self.width, self.height)
 		#dpg_callback.resize_viewport(self.width)
 
