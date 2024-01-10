@@ -7,6 +7,7 @@ class VideoStream:
 
 	def __init__(self, width=320, height=240):
 		self.stream = None
+		self.set_counter = False
 		self.change_source(source_type='webcam', source_file=0, width=width, height=height)
 		
 	def get_capture_api(self):
@@ -27,7 +28,7 @@ class VideoStream:
 
 		while True:
 			if self.stopped: 
-				self.stream.release()
+				if self.stream: self.stream.release()
 				return
 
 			if self.source_type=='video': self.stream.set(cv2.CAP_PROP_POS_FRAMES, int(self.frameNumber))
@@ -35,18 +36,24 @@ class VideoStream:
 			(self.grabbed, self.frame) = self.stream.read()
 
 			# calc fps
-			counter+=1
+			if self.source_type=='webcam':
+				counter+=1
+			else:
+				if self.set_counter:  
+					counter+=1
+					self.set_counter = False
 			if (time.time() - start_time) > fps_update_rate_sec:
 				self.fps = counter / (time.time() - start_time)
 				counter = 0
 				start_time = time.time()
+
 	
 	def read(self):
 		return (self.grabbed, self.frame)
 	
 	def stop(self):
 		self.stopped = True
-		self.t.join()
+		self.t.join(timeout=5)
 		self.stream=None
 		self.t=None
 	
@@ -87,9 +94,9 @@ class VideoStream:
 			if dpg.does_alias_exist('playback_controls'): dpg.show_item('playback_controls')
 			if dpg.does_alias_exist('camera_controls'): dpg.hide_item('camera_controls')
 			dpg.set_value('webcam_device_number', 'None')
-
+			
 		dpg_callback.recreate_raw_texture(self.width, self.height)
-		dpg_callback.resize_viewport(self.width)
+		#dpg_callback.resize_viewport(self.width)
 
 		self.stopped = False
 		self.fps = 0

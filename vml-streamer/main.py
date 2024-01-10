@@ -44,11 +44,19 @@ def video_set_frame(frameNumber):
 	video_playing = False
 	vs.frameNumber = frameNumber
 	dpg.set_value('video_frame', frameNumber)
-
+def video_prev_next_frame(sender, app_data, user_data):
+	if user_data=='prev':
+		vs.frameNumber -=1
+	else:
+		vs.frameNumber +=1
+	
 # DPG event handlers
 with dpg.item_handler_registry(tag='window_handler') as window_handler:
 	image_aspect = vs.height/vs.width
 	dpg.add_item_resize_handler(callback=dpg_callback.resize_img, user_data={'image_aspect':image_aspect})
+with dpg.handler_registry(tag='global_handler'):
+    dpg.add_key_press_handler(key=dpg.mvKey_Left, callback=video_prev_next_frame, user_data='prev')
+    dpg.add_key_press_handler(key=dpg.mvKey_Right, callback=video_prev_next_frame, user_data='next')
 
 # DPG UI
 with dpg.window(tag='mainwin') as mainwin:
@@ -180,7 +188,8 @@ if vs.isOpened():
 			if vs.source_type=='video' and video_playing:
 				fps_pb = dpg.get_value('fps_playback')
 				if fps_pb.strip()=='': fps_pb = 30
-				if time.time()-video_last_time>=1/float(fps_pb):
+				if time.time()-video_last_time>=1/(float(fps_pb)*1.666):
+					vs.set_counter=True
 					vs.frameNumber += 1  # increment
 					vs.frameNumber = vs.frameNumber%(vs.frames-1)  # loop
 					dpg.set_value('video_frame', vs.frameNumber)
@@ -295,15 +304,11 @@ if vs.isOpened():
 						counter_mpface+=1
 					
 					# send data
-					#if len(faces.joints.keys())>=0:
-					if True:
-						display_image = faces.display_image
-						cv2.cvtColor(display_image, cv2.COLOR_RGB2BGR)
-						skt.sendto(json.dumps(faces.joints).encode(), addr_port)
-						data_last[i] = faces.joints.copy()
-					else:
-						if i in data_last: skt.sendto(json.dumps(data_last[i]).encode(), addr_port)
-			
+					display_image = faces.display_image
+					cv2.cvtColor(display_image, cv2.COLOR_RGB2BGR)
+					skt.sendto(json.dumps(faces.joints).encode(), addr_port)
+					data_last[i] = faces.joints.copy()
+				
 			# Overlay FPS on webcam image
 			counter+=1
 			if (time.time() - start_time) > fps_update_rate_sec:
@@ -317,8 +322,9 @@ if vs.isOpened():
 			# DPG webcam texture update: convert to 32bit float, flatten and normalize 
 			display_image = np.asfarray(display_image.ravel(), dtype='f')
 			texture_data = np.true_divide(display_image, 255.0)
-			dpg.set_value('cv_frame', texture_data)
-
+			if dpg.does_alias_exist('cv_frame'): 
+				dpg.set_value('cv_frame', texture_data)
+			
 		# DPG render UI (max update rate = monitor vsync)
 		dpg.render_dearpygui_frame()
 
