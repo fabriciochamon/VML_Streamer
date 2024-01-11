@@ -11,7 +11,7 @@ import resources
 # Defaults
 frame_width  = 320
 frame_height = 240
-filebrowser_path = '~'
+filebrowser_path = '~' # user home
 
 # PyInstaller load splash screen
 if getattr(sys, 'frozen', False): import pyi_splash
@@ -19,7 +19,7 @@ if getattr(sys, 'frozen', False): import pyi_splash
 # Socket connection (udp)
 skt = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
 
-# fixes segfault when deleting dpg textures on Linux
+# fixes segfault when deleting DPG textures on Linux
 if platform.system()=='Linux': os.environ["__GLVND_DISALLOW_PATCHING"] = '1'
 
 # DPG init
@@ -53,13 +53,12 @@ def video_prev_next_frame(sender, app_data, user_data):
 	
 # DPG event handlers
 with dpg.item_handler_registry(tag='window_handler') as window_handler:
-	image_aspect = vs.height/vs.width
-	dpg.add_item_resize_handler(callback=dpg_callback.resize_img, user_data={'image_aspect':image_aspect})
+	dpg.add_item_resize_handler(callback=dpg_callback.resize_img, user_data=vs)
 
 with dpg.handler_registry(tag='global_handler'):
-    dpg.add_key_press_handler(key=dpg.mvKey_Left, callback=video_prev_next_frame, user_data='prev')
+    dpg.add_key_press_handler(key=dpg.mvKey_Left,  callback=video_prev_next_frame, user_data='prev')
     dpg.add_key_press_handler(key=dpg.mvKey_Right, callback=video_prev_next_frame, user_data='next')
-    dpg.add_key_press_handler(key=dpg.mvKey_Up, callback=video_play_pause)
+    dpg.add_key_press_handler(key=dpg.mvKey_Up,    callback=video_play_pause)
 
 # DPG UI
 with dpg.window(tag='mainwin') as mainwin:
@@ -68,7 +67,7 @@ with dpg.window(tag='mainwin') as mainwin:
 	with dpg.group(tag='video_image_parent'):
 		dpg.add_image(texture_tag='cv_frame', tag='video_image')
 	
-	# webcam config controls (for linux only!)
+	# webcam config controls (for linux only!) - uses v4l2 driver
 	if platform.system()=='Linux':
 		dpg_callback.set_webcam_custom_config('auto_exposure', 1)
 		with dpg.group(tag='camera_controls'):
@@ -110,6 +109,8 @@ dpg.bind_item_handler_registry(mainwin, window_handler)
 with dpg.viewport_menu_bar() as mainmenu:
 	with dpg.menu(label='Settings'):
 		with dpg.menu(label='Video source'):
+
+			# file browser
 			file_formats = [ {'label': 'Videos', 'formats': ['mp4', 'mov', 'mkv', 'mpg', 'mpeg', 'avi', 'wmv', 'webm']} ]
 			fb = dpge.add_file_browser(
 				label=('Open file...', 'File browser'), 
@@ -129,12 +130,18 @@ with dpg.viewport_menu_bar() as mainmenu:
 				show_nav_icons=False,
 				callback=lambda sender, files, cancel_pressed: vs.change_source(source_type='video', source_file=files[0]),
 				)			
+
+			# webcam devices
 			with dpg.menu(label='Webcam:'):
 				devices = ['None']
 				devices.extend(list(range(10)))
 				dpg.add_radio_button(tag='webcam_device_number', items=devices, default_value='0', callback=lambda sender, app_data: vs.change_source(source_type='webcam', source_file=int(app_data) if app_data!='None' else 11))
+
+		# always on top		
 		dpg.add_checkbox(tag='always_on_top', label='Always on top', default_value=True, callback=dpg_callback.always_on_top)
 		dpg_callback.always_on_top(dpg.last_item())
+
+		# flip video
 		dpg.add_checkbox(tag='flip', label='Flip video horizontal', default_value=True)			
 
 # DPG show viewport
@@ -184,12 +191,12 @@ if vs.isOpened():
 			# flip image?
 			if dpg.get_value('flip'): frame = cv2.flip(frame, 1)
 
-			# increment video frame
+			# if playing video, increment frame
 			if vs.source_type=='video' and video_playing:
 				fps_pb = dpg.get_value('fps_playback')
 				if fps_pb.strip()=='': fps_pb = 30
 				if time.time()-video_last_time>=1/(float(fps_pb)*1.666):
-					vs.set_counter=True
+					vs.set_counter = True
 					vs.frameNumber += 1  # increment
 					vs.frameNumber = vs.frameNumber%(vs.frames-1)  # loop
 					dpg.set_value('video_frame', vs.frameNumber)
@@ -275,7 +282,7 @@ if vs.isOpened():
 						ts_last[i] = ts[i]
 						bodies.image = mp.Image(mp.ImageFormat.SRGB, data=data)
 						bodies.detect(ts[i])	
-						counter_mpbody+=1
+						counter_mpbody+=100
 
 					# send data
 					if len(bodies.joints.keys())>0:
@@ -298,11 +305,9 @@ if vs.isOpened():
 					ts[i] = counter_mpface
 					if ts[i] > ts_last[i]: 
 						ts_last[i] = ts[i]
-						faces.apply_filter = stream['applyFilter']
-						faces.one_euro_beta = stream['beta']
 						faces.image = mp.Image(mp.ImageFormat.SRGB, data=data)
 						faces.detect(ts[i])	
-						counter_mpface+=1
+						counter_mpface+=100
 					
 					# send data
 					display_image = faces.display_image
@@ -310,7 +315,8 @@ if vs.isOpened():
 					skt.sendto(json.dumps(faces.joints).encode(), addr_port)
 					data_last[i] = faces.joints.copy()
 
-			# Overlay FPS over video
+			
+			# Overlay FPS
 			# MT = main thread
 			# CV = openCV video thread
 			counter+=1
@@ -325,17 +331,15 @@ if vs.isOpened():
 			# DPG webcam texture update: convert to 32bit float, flatten and normalize 
 			display_image = np.asfarray(display_image.ravel(), dtype='f')
 			texture_data = np.true_divide(display_image, 255.0)
-			
 			if dpg.does_alias_exist('cv_frame'):
-				with dpg.mutex():
-					dpg.set_value('cv_frame', texture_data)			
-				
+				with dpg.mutex(): dpg.set_value('cv_frame', texture_data)			
+			
 		# DPG render UI (max update rate = monitor vsync)
 		dpg.render_dearpygui_frame()
 
 else:
 	# no webcam detected (linux only!) 
-	# on windows DSHOW will display an "empty" frame, so user needs to connect a device and restart
+	# on windows DSHOW will display an "empty" image, so user needs to connect a webcam device and restart
 	dpg.configure_viewport(0, width=400, height=200)
 	dpg.delete_item(mainwin, children_only=True)
 	dpg.delete_item(mainmenu)

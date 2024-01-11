@@ -32,20 +32,18 @@ def resize_img(sender, app_data, user_data):
 	img = 'video_image'
 	win = 'mainwin'
 	w, h = dpg.get_item_rect_size(win)
+	aspect = user_data.height/user_data.width
 	newW = w-18
-	newH = newW*user_data['image_aspect']
+	newH = newW*aspect
 	if dpg.does_alias_exist(img):
 		dpg.configure_item(img, width=newW)
 		dpg.configure_item(img, height=newH)
 
 # resize viewport to specific values
 def resize_viewport(w=None, h=None):
-	pass
-	'''
 	if w: dpg.configure_viewport(0, width=w+18)
 	if h: dpg.configure_viewport(0, height=h)
-	'''
-
+	
 # set viewport "always on top" mode
 def always_on_top(sender):
 	dpg.configure_viewport(0, always_on_top=dpg.get_value(sender))
@@ -101,7 +99,7 @@ def get_streams():
 		stream.update(get_stream_settings(stype, i))
 		
 		# extra settings calculated
-		if stype in [st.ST_MP_HANDS, st.ST_MP_FACE]:
+		if stype in [st.ST_MP_HANDS]:
 			stream['beta'] = change_range(stream['smoothingFactor'], 0, 100, 100, 0.5)
 
 		streams.append(stream)
@@ -184,7 +182,7 @@ def add_stream(sender, app_data, user_data):
 
 			tag_settings = f'{index}_{t}_settings'
 
-			if t in [st.ST_INFO_DICT, st.ST_VIDEO, st.ST_MP_BODY]:
+			if t in [st.ST_INFO_DICT, st.ST_VIDEO, st.ST_MP_BODY, st.ST_MP_FACE]:
 				with dpg.group(tag=tag_settings, indent=20):
 					dpg.add_spacer(height=1)
 
@@ -198,14 +196,6 @@ def add_stream(sender, app_data, user_data):
 					with dpg.group(horizontal=True):
 						dpg.add_text('Ensure both hands:'.ljust(20), color=(245, 212, 66))
 						dpg.add_checkbox(tag=f'{tag_settings}_ensureHands', default_value=False)
-
-			elif t == st.ST_MP_FACE:
-				with dpg.group(tag=tag_settings, indent=20, show=False):
-					with dpg.group(horizontal=True):
-						dpg.add_text('Motion filter:', color=(245, 212, 66))
-						dpg.add_checkbox(tag=f'{tag_settings}_applyFilter', default_value=True)
-						with dpg.tooltip(parent=dpg.last_item()): dpg.add_text('Applies a "One-Euro" smoothing filter over the input signal.', wrap=200)
-						dpg.add_slider_float(tag=f'{tag_settings}_smoothingFactor', default_value=60, min_value=0, max_value=100, width=120)
 					
 		dpg.add_separator()
 

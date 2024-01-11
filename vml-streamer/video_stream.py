@@ -103,7 +103,7 @@ class VideoStream:
 			dpg.set_value('webcam_device_number', 'None')
 
 		dpg_callback.recreate_raw_texture(self.width, self.height)
-		#dpg_callback.resize_viewport(self.width)
+		dpg_callback.resize_viewport(self.width)
 
 		self.stopped = False
 		self.fps = 0
