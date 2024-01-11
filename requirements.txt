@@ -5,7 +5,7 @@ cffi==1.16.0
 contourpy==1.2.0
 cycler==0.12.1
 dearpygui==1.9.1
-dearpygui-extend==0.1.2
+dearpygui-extend==0.1.3
 Fileseq==1.15.2
 flatbuffers==23.5.26
 fonttools==4.46.0
