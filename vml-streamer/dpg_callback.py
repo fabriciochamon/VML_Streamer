@@ -182,11 +182,8 @@ def add_stream(sender, app_data, user_data):
 
 			tag_settings = f'{index}_{t}_settings'
 
-			if t in [st.ST_INFO_DICT, st.ST_VIDEO, st.ST_MP_BODY, st.ST_MP_FACE]:
-				with dpg.group(tag=tag_settings, indent=20):
-					dpg.add_spacer(height=1)
-
-			elif t == st.ST_MP_HANDS:
+			# custom extra settings for MP_HANDS
+			if t == st.ST_MP_HANDS:
 				with dpg.group(tag=tag_settings, indent=20, show=False):
 					with dpg.group(horizontal=True):
 						dpg.add_text('Motion filter:'.ljust(20), color=(245, 212, 66))
@@ -196,7 +193,12 @@ def add_stream(sender, app_data, user_data):
 					with dpg.group(horizontal=True):
 						dpg.add_text('Ensure both hands:'.ljust(20), color=(245, 212, 66))
 						dpg.add_checkbox(tag=f'{tag_settings}_ensureHands', default_value=False)
-					
+
+			# empty extra settings by default
+			else:
+				with dpg.group(tag=tag_settings, indent=20):
+					dpg.add_spacer(height=1)
+
 		dpg.add_separator()
 
 # change specific webcam config control (linux only!) using v4l2-ctl in a subprocess
