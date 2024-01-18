@@ -4,7 +4,7 @@
 
 # VML_Streamer
 Vision and Machine Learning data streamer for 
-[SideFX Houdini](https://www.sidefx.com/)
+[SideFX Houdini](https://www.sidefx.com/). (Intended use video [here](https://www.youtube.com/watch?v=AqozqMFU_kg))
 
 ---
 
