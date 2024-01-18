@@ -10,7 +10,7 @@ import resources
 
 # Defaults
 video_size_at_start = 1
-filebrowser_path = '~/Downloads' # user home
+filebrowser_path = '~' # user home
 
 # PyInstaller load splash screen
 if getattr(sys, 'frozen', False): import pyi_splash
