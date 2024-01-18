@@ -9,9 +9,8 @@ import stream_types as st
 import resources
 
 # Defaults
-frame_width  = 320
-frame_height = 240
-filebrowser_path = '~' # user home
+video_size_at_start = 1
+filebrowser_path = '~/Downloads' # user home
 
 # PyInstaller load splash screen
 if getattr(sys, 'frozen', False): import pyi_splash
@@ -24,16 +23,16 @@ if platform.system()=='Linux': os.environ["__GLVND_DISALLOW_PATCHING"] = '1'
 
 # DPG init
 dpg.create_context()
-dpg.create_viewport(title='VML Streamer', width=frame_width, height=frame_height)
+dpg.create_viewport(title='VML Streamer', width=320, height=240)
 dpg.setup_dearpygui()
-dpg.add_texture_registry(tag='treg')
+dpg.add_texture_registry(tag='treg', show=False)
 #dpg.show_item_registry()
 #dpg.show_metrics()
 
 # CV Init video capture
 display_image = None
 video_playing = True
-vs = VideoStream(frame_width, frame_height).start()
+vs = VideoStream(size=video_size_at_start).start()
 
 # video callbacks
 def video_play_pause():
@@ -47,9 +46,19 @@ def video_set_frame(frameNumber):
 	dpg.set_value('video_frame', frameNumber)
 
 def video_prev_next_frame(sender, app_data, user_data):
-	if user_data=='prev': vs.frameNumber -=1
-	else: vs.frameNumber +=1
+	if user_data=='prev':
+		if dpg.is_key_down(dpg.mvKey_Control): vs.frameNumber = 1
+		else: vs.frameNumber -=1
+	else:
+		if dpg.is_key_down(dpg.mvKey_Control): vs.frameNumber = vs.frames-1
+		else: vs.frameNumber +=1
+
 	dpg.set_value('video_frame', vs.frameNumber)
+
+# DPG themes
+with dpg.theme() as info_text_theme:
+    with dpg.theme_component(dpg.mvAll):
+        dpg.add_theme_color(dpg.mvThemeCol_Text, (120, 120, 120))
 	
 # DPG event handlers
 with dpg.item_handler_registry(tag='window_handler') as window_handler:
@@ -65,7 +74,18 @@ with dpg.window(tag='mainwin') as mainwin:
 	
 	# opencv video feedback
 	with dpg.group(tag='video_image_parent'):
-		dpg.add_image(texture_tag='cv_frame', tag='video_image')
+		dpg.add_image(texture_tag='cv_frame', tag='video_image', show=False)
+		resources.add_icon('no_video')
+		dpg.add_image(texture_tag='no_video', tag='video_image_empty', show=True, width=415, height=300)
+
+	# video size mult
+	with dpg.group():
+		with dpg.group(horizontal=True):
+			dpg.add_text('Video size: ')
+			dpg.add_input_text(tag='video_size', decimal=True, on_enter=True, default_value=video_size_at_start, width=50, callback=lambda: vs.change_source(source_type=vs.source_type, source_file=vs.source_file))
+			dpg.add_spacer(width=20)
+			dpg.add_text('', tag='video_info_txt')
+			dpg.bind_item_theme(dpg.last_item(), info_text_theme)
 	
 	# webcam config controls (for linux only!) - uses v4l2 driver
 	if platform.system()=='Linux':
@@ -91,11 +111,20 @@ with dpg.window(tag='mainwin') as mainwin:
 	with dpg.group(horizontal=True, tag='playback_controls', show=False):
 		dpg.add_image_button('icon_first_frame', width=playback_icon_size, height=playback_icon_size, callback=lambda: video_set_frame(0))
 		dpg.add_image_button('icon_play_pause', width=playback_icon_size*1.64, height=playback_icon_size, callback=video_play_pause)
+		with dpg.tooltip(parent=dpg.last_item()):
+			dpg.add_text('Playback controls:')
+			dpg.add_text('UP arrow: play/pause', indent=5)
+			dpg.add_text('LEFT arrow: previous frame', indent=5)
+			dpg.add_text('RIGHT arrow: next frame', indent=5)
+			dpg.add_text('CTRL+LEFT arrow: goto first frame', indent=5)
+			dpg.add_text('CTRL+RIGHT arrow: goto last frame', indent=5)
 		dpg.add_image_button('icon_last_frame', width=playback_icon_size, height=playback_icon_size, callback=lambda: video_set_frame(vs.frames-1))
 		dpg.add_text('fps:')
 		dpg.add_input_text(tag='fps_playback', default_value='24', width=30)
 		dpg.add_slider_int(tag='video_frame', min_value=0, max_value=100, width=-1, callback=lambda sender, val: video_set_frame(val))
-		
+
+
+
 	dpg.add_spacer(height=15)
 
 	# "add stream" button
@@ -128,14 +157,27 @@ with dpg.viewport_menu_bar() as mainmenu:
 				allow_multi_selection=False,
 				allow_create_new_folder=False,
 				show_nav_icons=False,
-				callback=lambda sender, files, cancel_pressed: vs.change_source(source_type='video', source_file=files[0]),
-				)			
+				callback=lambda sender, files, cancel_pressed: vs.load_video_file(files, cancel_pressed),
+				)	
+
+			button = dpg.get_item_children(mainmenu, 1)[0]
+			button = dpg.get_item_children(button, 1)[0]
+			button = dpg.get_item_children(button, 1)[0]
+			dpg.configure_item(button, callback=lambda: dpg_callback.show_filebrowser(fb))
 
 			# webcam devices
+			if getattr(sys, 'frozen', False): pyi_splash.update_text('Fetching available webcam devices...')
 			with dpg.menu(label='Webcam:'):
 				devices = ['None']
-				devices.extend(list(range(10)))
-				dpg.add_radio_button(tag='webcam_device_number', items=devices, default_value='0', callback=lambda sender, app_data: vs.change_source(source_type='webcam', source_file=int(app_data) if app_data!='None' else 11))
+				devices.extend(dpg_callback.get_connected_devices())
+				dpg.add_radio_button(tag='webcam_device_number', items=devices, default_value='None', callback=lambda sender, app_data: vs.change_source(source_type='webcam', source_file=app_data))
+
+		with dpg.menu(label='Video capture API'):
+			cap_api_items = ['First available']
+			cap_api_default = 'First available'
+			if platform.system()=='Windows': cap_api_items.extend(['Direct Show'])
+			if platform.system()=='Linux': cap_api_items.extend(['V4L2'])
+			dpg.add_radio_button(tag='cv_vid_cap_api', items=cap_api_items, default_value=cap_api_default)
 
 		# always on top		
 		dpg.add_checkbox(tag='always_on_top', label='Always on top', default_value=True, callback=dpg_callback.always_on_top)
@@ -146,7 +188,7 @@ with dpg.viewport_menu_bar() as mainmenu:
 
 # DPG show viewport
 dpg.show_viewport()
-dpg.set_viewport_width(vs.width+18)
+dpg.set_viewport_width(450)
 dpg.set_viewport_height(720)
 dpg.set_primary_window(mainwin, True)
 
@@ -156,9 +198,9 @@ ts_last={}
 data_last={}
 
 # MediaPipe init
-hands  = process_mp_hands.MediaPipe_Hands(frame_width, frame_height)
-bodies = process_mp_body.MediaPipe_Bodies(frame_width, frame_height)
-faces  = process_mp_face.MediaPipe_Faces(frame_width, frame_height)
+hands  = process_mp_hands.MediaPipe_Hands(vs.width, vs.height)
+bodies = process_mp_body.MediaPipe_Bodies(vs.width, vs.height)
+faces  = process_mp_face.MediaPipe_Faces(vs.width, vs.height)
 
 # PyInstaller close splash screen
 if getattr(sys, 'frozen', False): pyi_splash.close()
@@ -167,7 +209,6 @@ if vs.isOpened():
 
 	# FPS calc init (main thread)
 	fps = 30.0
-	textsize = cv2.getTextSize(f'fps: {fps}', fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=0.3, thickness=1)
 	start_time = time.time()
 	counter = 0
 	fps_update_rate_sec = 1 # update fps at every 1 second
@@ -324,28 +365,17 @@ if vs.isOpened():
 				fps = counter / (time.time() - start_time)
 				counter = 0
 				start_time = time.time()
-			cv2.rectangle(display_image, (0, vs.height-textsize[1]-20), (105, vs.height), (50,50,50), -1)
-			textpos = (5, vs.height-textsize[1]-5)
-			cv2.putText(display_image, f'MT: {fps:.1f}  CV: {vs.fps:.1f}', textpos, cv2.FONT_HERSHEY_DUPLEX, 0.3, (255,255,255), 1, cv2.LINE_AA)
-
+			dpg.set_value('video_info_txt', f'{vs.fps:.1f} fps @ {vs.width}x{vs.height}')
+			
 			# DPG webcam texture update: convert to 32bit float, flatten and normalize 
 			display_image = np.asfarray(display_image.ravel(), dtype='f')
 			texture_data = np.true_divide(display_image, 255.0)
+	
 			if dpg.does_alias_exist('cv_frame'):
 				with dpg.mutex(): dpg.set_value('cv_frame', texture_data)			
 			
 		# DPG render UI (max update rate = monitor vsync)
 		dpg.render_dearpygui_frame()
-
-else:
-	# no webcam detected (linux only!) 
-	# on windows DSHOW will display an "empty" image, so user needs to connect a webcam device and restart
-	dpg.configure_viewport(0, width=400, height=200)
-	dpg.delete_item(mainwin, children_only=True)
-	dpg.delete_item(mainmenu)
-	dpg.add_text('Error: No webcam device found!', color=(255,0,0), parent=mainwin)
-	dpg.add_text('Please connect a device and restart application.', color=(255,0,0), parent=mainwin)
-	dpg.start_dearpygui()
 
 # Terminate
 vs.stop()

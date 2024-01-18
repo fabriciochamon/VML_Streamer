@@ -1,4 +1,4 @@
-import sys, subprocess
+import sys, subprocess, cv2
 import dearpygui.dearpygui as dpg
 import numpy as np
 import stream_types as st
@@ -25,7 +25,22 @@ def recreate_raw_texture(width=320, height=240):
 
 # remap value between range
 def change_range(unscaled, from_min, from_max, to_min, to_max):
-    return (to_max-to_min)*(unscaled-from_min)/(from_max-from_min)+to_min
+	return (to_max-to_min)*(unscaled-from_min)/(from_max-from_min)+to_min
+
+# list available webcam devices
+def get_connected_devices(test_num_ports=5):
+	dev_port = 0
+	working_ports = []
+	cap_api = cv2.CAP_ANY
+	if platform.system()=='Windows': cap_api = cv2.CAP_DSHOW
+	if platform.system()=='Linux': cap_api = cv2.CAP_V4L2
+	while dev_port < test_num_ports-1:
+		camera = cv2.VideoCapture(dev_port, cap_api)
+		if camera.isOpened(): working_ports.append(dev_port)
+		try: camera.release()
+		except: pass
+		dev_port +=1
+	return working_ports
 
 # resize webcam texture to match main window size
 def resize_img(sender, app_data, user_data):
@@ -43,6 +58,12 @@ def resize_img(sender, app_data, user_data):
 def resize_viewport(w=None, h=None):
 	if w: dpg.configure_viewport(0, width=w+18)
 	if h: dpg.configure_viewport(0, height=h)
+
+# overrides DPGE "Open..." button filebrowser callback to also resize main window
+def show_filebrowser(fb):
+	dpg.configure_item('dpge_filebrowser_window', pos=[10,30])
+	dpg.show_item('dpge_filebrowser_window')
+	resize_viewport(800, 800)
 	
 # set viewport "always on top" mode
 def always_on_top(sender):

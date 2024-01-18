@@ -4,6 +4,7 @@ images = [
     ('images/icon_first_frame.png', './images'),
     ('images/icon_last_frame.png', './images'),
     ('images/icon_play_pause.png', './images'),
+    ('images/no_video.png', './images'),
 ]
 
 a = Analysis(
