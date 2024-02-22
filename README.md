@@ -1,3 +1,5 @@
+This version is now deprecated! Please check the [new version](https://github.com/fabriciochamon/VML_Streamer_QT) of VML Streamer for future updates.
+
 <!-- Splash logo
 ![VML Streamer Splash](assets/images/vml_streamer_splash.png)
 -->
